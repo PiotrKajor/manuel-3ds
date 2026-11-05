@@ -12,6 +12,7 @@ project. In-game text is English.
   same game as a shared library for tests.
 - Sound: own chiptune synth through NDSP (needs `/3ds/dspfirm.cdc`, present on the user's card).
   Without it the game runs silently.
+- Game data lives in RomFS. On New 3DS family consoles the game asks for 804 MHz, L2 cache and 124 MB.
 - Save: `sdmc:/3ds/Manuel/save.bin`.
 
 ## Content

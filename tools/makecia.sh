@@ -20,4 +20,5 @@ fi
 "$T/bannertool" makebanner -i build/banner.png -a build/banner.wav -o build/banner.bnr
 "$T/bannertool" makesmdh -s "Manuel and the Last Bell" -l "Manuel and the Last Bell" -p "Manuel project" -i build/icon.png -o build/icon.icn
 "$T/makerom" -f cia -o build/Manuel.cia -rsf tools/manuel.rsf -target t -exefslogo -elf build/Manuel.elf -icon build/icon.icn -banner build/banner.bnr
+python3 -I tools/check_cia.py build/Manuel.cia
 ls -la build/Manuel.cia

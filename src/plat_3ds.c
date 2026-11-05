@@ -2,12 +2,10 @@
 #include <3ds.h>
 #include <stdio.h>
 #include <malloc.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include "core.h"
-
-extern const uint8_t assets_bin[];
-__asm__(".section .rodata\n.balign 4\n.global assets_bin\nassets_bin:\n.incbin \"build/assets.bin\"\n.previous\n");
 
 #define SAVE_DIR "sdmc:/3ds/Manuel"
 #define SAVE_PATH SAVE_DIR "/save.bin"
@@ -180,15 +178,50 @@ static void overlay(double step_ms, double total_ms, double worst_ms, int late) 
     render_text_bot(4, 224, b);
 }
 
+/* Graphics live in RomFS, as in other homebrew, and are read into memory once at start. */
+static void *load_assets(void) {
+    FILE *f;
+    long n;
+    void *mem = NULL;
+    if (R_FAILED(romfsInit())) return NULL;
+    f = fopen("romfs:/assets.bin", "rb");
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        n = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        mem = memalign(4, (size_t)n);
+        if (mem && fread(mem, 1, (size_t)n, f) != (size_t)n) { free(mem); mem = NULL; }
+        fclose(f);
+    }
+    romfsExit();
+    return mem;
+}
+
+static void fatal(const char *msg) {
+    consoleInit(GFX_TOP, NULL);
+    printf("\n Manuel could not start:\n %s\n\n Press START to exit.\n", msg);
+    while (aptMainLoop()) {
+        hidScanInput();
+        if (hidKeysDown() & KEY_START) break;
+        gfxFlushBuffers();
+        gfxSwapBuffers();
+        gspWaitForVBlank();
+    }
+    gfxExit();
+}
+
 int main(void) {
+    void *blob;
     static int show_perf, late;
     static double worst;
     osSetSpeedupEnable(true);
     gfxInit(GSP_RGB565_OES, GSP_RGB565_OES, false);
     gfxSetDoubleBuffering(GFX_TOP, true);
     gfxSetDoubleBuffering(GFX_BOTTOM, true);
+    blob = load_assets();
+    if (!blob) { fatal("game data not found in RomFS"); return 1; }
     audio_start();
-    core_init(assets_bin);
+    core_init(blob);
 #ifdef BENCH
     bench();
     G.want_exit = 1;

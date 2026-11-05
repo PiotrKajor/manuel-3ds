@@ -117,7 +117,7 @@ Bot steruje grą tymi samymi przyciskami co gracz i korzysta z prawdziwej fizyki
 
 - **`tests/fuzz.c`** gra losowymi przyciskami we wszystkich pokojach pod ASan i UBSan, sprawdza utknięcia w ścianach, wyjście poza ekran i uszkodzone pliki zapisu.
 
-`.3dsx` i instalacja `.cia` zostały sprawdzone w emulatorze Azahar. Gra nie była jeszcze uruchamiana na fizycznej konsoli, więc wydajność i dźwięk na sprzęcie są niepotwierdzone.
+`.3dsx` oraz `.cia`, zainstalowany i uruchomiony jako tytuł, zostały sprawdzone w emulatorze Azahar. `tools/check_cia.py` przy każdym budowaniu sprawdza nagłówek `.cia`. Gra nie była jeszcze uruchamiana na fizycznej konsoli, więc wydajność i dźwięk na sprzęcie są niepotwierdzone.
 
 ## Wydajność
 

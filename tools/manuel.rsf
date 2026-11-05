@@ -7,6 +7,9 @@ TitleInfo:
   Category                : Application
   UniqueId                : 0x0F4E11
 
+RomFs:
+  RootPath: build/romfs
+
 Option:
   UseOnSD                 : true
   FreeProductCode         : true
@@ -21,8 +24,7 @@ AccessControlInfo:
   ReleaseKernelMinor            : "33"
   UseExtSaveData                : false
   IORegisterMapping:
-   - 1ff50000-1ff57fff
-   - 1ff70000-1ff77fff
+   - 1ff00000-1ff7ffff
   MemoryMapping:
    - 1f000000-1f5fffff:r
   HandleTableSize               : 512
@@ -32,10 +34,10 @@ AccessControlInfo:
   MaxCpu                        : 0x9E
   CanAccessCore2                : true
   SystemMode                    : 64MB
-  SystemModeExt                 : Legacy
-  CpuSpeed                      : 268MHz
-  EnableL2Cache                 : false
-  DisableDebug                  : true
+  SystemModeExt                 : 124MB
+  CpuSpeed                      : 804MHz
+  EnableL2Cache                 : true
+  DisableDebug                  : false
   EnableForceDebug              : false
   CanWriteSharedPage            : true
   CanUsePrivilegedPriority      : false
@@ -45,93 +47,140 @@ AccessControlInfo:
   RunnableOnSleep               : false
   SpecialMemoryArrange          : true
   ResourceLimitCategory         : Application
+  MemoryType                    : Application
   SystemCallAccess:
-    ArbitrateAddress: 34
-    Break: 60
-    CancelTimer: 28
-    ClearEvent: 25
-    ClearTimer: 29
-    CloseHandle: 35
-    ConnectToPort: 45
-    ControlMemory: 1
-    ControlProcessMemory: 112
-    CreateAddressArbiter: 33
-    CreateEvent: 23
-    CreateMemoryBlock: 30
-    CreateMutex: 19
-    CreateSemaphore: 21
-    CreateThread: 8
-    CreateTimer: 26
-    DuplicateHandle: 39
-    ExitProcess: 3
-    ExitThread: 9
-    GetCurrentProcessorNumber: 17
-    GetHandleInfo: 41
-    GetProcessId: 53
-    GetProcessIdOfThread: 54
-    GetProcessIdealProcessor: 6
-    GetProcessInfo: 43
-    GetResourceLimit: 56
-    GetResourceLimitCurrentValues: 58
-    GetResourceLimitLimitValues: 57
-    GetSystemInfo: 42
-    GetSystemTick: 40
-    GetThreadContext: 59
-    GetThreadId: 55
-    GetThreadIdealProcessor: 15
-    GetThreadInfo: 44
-    GetThreadPriority: 11
-    MapMemoryBlock: 31
-    OutputDebugString: 61
-    QueryMemory: 2
-    ReleaseMutex: 20
-    ReleaseSemaphore: 22
-    SendSyncRequest1: 46
-    SendSyncRequest2: 47
-    SendSyncRequest3: 48
-    SendSyncRequest4: 49
-    SendSyncRequest: 50
-    SetThreadPriority: 12
-    SetTimer: 27
-    SignalEvent: 24
-    SleepThread: 10
-    UnmapMemoryBlock: 32
-    WaitSynchronization1: 36
-    WaitSynchronizationN: 37
-    Backdoor: 123
+    Svc01: 1
+    Svc02: 2
+    Svc03: 3
+    Svc04: 4
+    Svc05: 5
+    Svc06: 6
+    Svc07: 7
+    Svc08: 8
+    Svc09: 9
+    Svc0A: 10
+    Svc0B: 11
+    Svc0C: 12
+    Svc0D: 13
+    Svc0E: 14
+    Svc0F: 15
+    Svc10: 16
+    Svc11: 17
+    Svc12: 18
+    Svc13: 19
+    Svc14: 20
+    Svc15: 21
+    Svc16: 22
+    Svc17: 23
+    Svc18: 24
+    Svc19: 25
+    Svc1A: 26
+    Svc1B: 27
+    Svc1C: 28
+    Svc1D: 29
+    Svc1E: 30
+    Svc1F: 31
+    Svc20: 32
+    Svc21: 33
+    Svc22: 34
+    Svc23: 35
+    Svc24: 36
+    Svc25: 37
+    Svc26: 38
+    Svc27: 39
+    Svc28: 40
+    Svc29: 41
+    Svc2A: 42
+    Svc2B: 43
+    Svc2C: 44
+    Svc2D: 45
+    Svc2E: 46
+    Svc2F: 47
+    Svc30: 48
+    Svc31: 49
+    Svc32: 50
+    Svc33: 51
+    Svc34: 52
+    Svc35: 53
+    Svc36: 54
+    Svc37: 55
+    Svc38: 56
+    Svc39: 57
+    Svc3A: 58
+    Svc3B: 59
+    Svc3C: 60
+    Svc3D: 61
+    Svc3E: 62
+    Svc47: 71
+    Svc48: 72
+    Svc49: 73
+    Svc4A: 74
+    Svc4B: 75
+    Svc4C: 76
+    Svc4D: 77
+    Svc4E: 78
+    Svc4F: 79
+    Svc50: 80
+    Svc51: 81
+    Svc52: 82
+    Svc53: 83
+    Svc54: 84
+    Svc55: 85
+    Svc56: 86
+    Svc57: 87
+    Svc58: 88
+    Svc60: 96
+    Svc61: 97
+    Svc62: 98
+    Svc63: 99
+    Svc64: 100
+    Svc65: 101
+    Svc66: 102
+    Svc67: 103
+    Svc68: 104
+    Svc69: 105
+    Svc6A: 106
+    Svc6B: 107
+    Svc6C: 108
+    Svc6D: 109
+    Svc70: 112
+    Svc71: 113
+    Svc72: 114
+    Svc73: 115
+    Svc75: 117
+    Svc76: 118
+    Svc77: 119
+    Svc78: 120
+    Svc79: 121
+    Svc7A: 122
+    Svc7B: 123
+    Svc7C: 124
+    Svc7D: 125
   InterruptNumbers:
   ServiceAccessControl:
    - APT:U
-   - $hioFIO
-   - $hostio0
-   - $hostio1
    - ac:u
+   - am:u
    - boss:U
-   - cam:u
    - cecd:u
    - cfg:u
-   - dlp:FKCL
-   - dlp:SRVR
+   - csnd:SND
    - dsp::DSP
-   - frd:u
    - fs:USER
    - gsp::Gpu
    - hid:USER
-   - mic:u
    - ndm:u
    - news:s
    - nwm::UDS
    - ptm:u
    - pxi:dev
    - soc:U
-   - gsp::Lcd
    - y2r:u
    - ldr:ro
    - ir:USER
    - ir:u
-   - csnd:SND
-   - am:u
    - ns:s
+   - mic:u
   FileSystemAccess:
    - DirectSdmc
 
@@ -140,31 +189,21 @@ SystemControlInfo:
   RemasterVersion: 0
   StackSize: 0x40000
   Dependency:
-    ac: 0x0004013000002402L
-    am: 0x0004013000001502L
-    boss: 0x0004013000003402L
-    camera: 0x0004013000001602L
-    cecd: 0x0004013000002602L
-    cfg: 0x0004013000001702L
-    codec: 0x0004013000001802L
-    csnd: 0x0004013000002702L
-    dlp: 0x0004013000002802L
-    dsp: 0x0004013000001a02L
-    friends: 0x0004013000003202L
-    gpio: 0x0004013000001b02L
-    gsp: 0x0004013000001c02L
-    hid: 0x0004013000001d02L
-    i2c: 0x0004013000001e02L
-    ir: 0x0004013000003302L
-    mcu: 0x0004013000001f02L
-    mic: 0x0004013000002002L
-    ndm: 0x0004013000002b02L
-    news: 0x0004013000003502L
-    nim: 0x0004013000002c02L
-    nwm: 0x0004013000002d02L
-    pdn: 0x0004013000002102L
-    ps: 0x0004013000003102L
-    ptm: 0x0004013000002202L
-    ro: 0x0004013000003702L
-    socket: 0x0004013000002e02L
-    spi: 0x0004013000002302L
+    dep00: 0x0004013000002402L
+    dep01: 0x0004013000001502L
+    dep02: 0x0004013000003402L
+    dep03: 0x0004013000002602L
+    dep04: 0x0004013000001702L
+    dep05: 0x0004013000001802L
+    dep06: 0x0004013000002702L
+    dep07: 0x0004013000001a02L
+    dep08: 0x0004013000001c02L
+    dep09: 0x0004013000001d02L
+    dep10: 0x0004013000002902L
+    dep11: 0x0004013000001f02L
+    dep12: 0x0004013020004102L
+    dep13: 0x0004013000002b02L
+    dep14: 0x0004013000002d02L
+    dep15: 0x0004013000003102L
+    dep16: 0x0004013000002e02L
+    dep17: 0x0004013000002f02L
