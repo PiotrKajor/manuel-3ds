@@ -1,6 +1,7 @@
 /* Menuel - software renderer. The world spans both screens; sprites are drawn to whichever screens they touch. */
 #include "core.h"
 
+#define RUSH_FRAMES 14
 static uint16_t bg[WH][WW];
 static uint8_t bg_room = 255;
 static int shx, shy;
@@ -17,6 +18,8 @@ static inline uint16_t blend(uint16_t d, uint16_t s, uint32_t a) {   /* a: 0..32
 }
 
 /* Draw with the anchor at (x,y) on one framebuffer. */
+static int blit_ghost;   /* 0 normal; otherwise a lilac silhouette at this strength (0..32) */
+
 static void blit_fb(uint16_t *fb, int fw, int fh, int id, int x, int y, int flip, int flash) {
     const SprDef *s = &spr_defs[id];
     const uint16_t *col = assets + s->off;
@@ -35,6 +38,7 @@ static void blit_fb(uint16_t *fb, int fw, int fh, int id, int x, int y, int flip
             int sx = flip ? w - 1 - xx : xx;
             uint32_t av = a[sx];
             if (av == 0) continue;
+            if (blit_ghost) { if (av > 128) dst[xx] = blend(dst[xx], 0xB39F, (uint32_t)blit_ghost); continue; }
             if (flash) { dst[xx] = blend(dst[xx], 0xFFFF, av >> 3); continue; }
             if (av >= 248) dst[xx] = c[sx];
             else dst[xx] = blend(dst[xx], c[sx], (av + 4) >> 3);
@@ -187,7 +191,11 @@ static void draw_entities(void) {
         const Ent *e = &r->ent[i];
         int x = e->tx * TS + 8, y = (e->ty + 1) * TS;
         if (e->type == ENT_NPC) {
-            wsprite(S_NPC0_0 + e->arg * 2 + ((G.frame >> 5) & 1), x, y, pcx < x, 0);
+            {
+                static const uint8_t cyc[16] = { 0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 3, 1 };
+                wsprite(S_SHADOW_M, x, y + 5, 0, 0);
+                wsprite(S_NPC0_0 + e->arg * 6 + cyc[(G.frame >> 3) & 15], x, y, pcx < x, 0);
+            }
         } else if (e->type == ENT_ANCHOR) {
             int dx = x - pcx, dy = e->ty * TS + 8 - pcy;
             int lit = HAS(F_HOOK) && dx * dx + dy * dy < 170 * 170;
@@ -208,20 +216,42 @@ static void draw_entities(void) {
     for (i = 0; i < MAX_EN; i++) {
         Enemy *e = &G.en[i];
         if (e->on) {
-            int f = (G.frame >> 3) & 3;
-            if (e->kind == 2 || e->kind == 7) f = e->vy ? 2 : 0;
-            wsprite(S_EN0_0 + e->kind * 4 + f, PX(e->x) + EW / 2, PX(e->y) + EH, e->dir ? 0 : 1, e->flash);
+            int f, ground = 1;
+            switch (e->kind) {
+            case 2: case 7:                         /* frog, hare: hop poses */
+                if (e->vy < 0) f = 3;
+                else if (e->vy > 0) f = 4;
+                else if (e->timer < 10) f = 2;
+                else if (e->timer > 52) f = 5;
+                else f = (G.frame >> 5) & 1;
+                if (e->vy) ground = 0;
+                break;
+            case 3: case 5:                         /* bell, furnace: breathe, wind up, spit */
+                if (e->timer < 14) f = 4;
+                else if (e->timer > 108) f = 5;
+                else f = (G.frame >> 4) & 3;
+                if (e->kind == 3) ground = 0;
+                break;
+            default:
+                f = (G.frame >> 2) % 6;
+                if (e->kind == 1 || e->kind == 6) ground = 0;
+                break;
+            }
+            if (ground) wsprite(S_SHADOW_M, PX(e->x) + EW / 2, PX(e->y) + EH + 5, 0, 0);
+            wsprite(S_EN0_0 + e->kind * 6 + f, PX(e->x) + EW / 2, PX(e->y) + EH, e->dir ? 0 : 1, e->flash);
         }
     }
     if (G.boss.active) {
         Boss *b = &G.boss;
         int f;
-        if (b->state == B_WIND || b->state == B_SLEEP) f = 2;
-        else if (b->state == B_STUN) f = 5;
-        else if (b->state == B_CHARGE || b->state == B_DROP) f = 3;
-        else if (b->state == B_JUMP || b->state == B_RISE) f = 4;
-        else f = (G.frame >> 5) & 1;
-        wsprite(S_BOSS0_0 + b->id * 6 + f, PX(b->x) + BOSS_S / 2, PX(b->y) + BOSS_S, b->face ? 1 : 0, b->flash || (b->state == B_WIND && (b->timer & 4)));
+        if (b->state == B_WIND || b->state == B_SLEEP) f = 4 + ((G.frame >> 3) & 1);
+        else if (b->state == B_STUN) f = 10 + ((G.frame >> 4) & 1);
+        else if (b->state == B_CHARGE || b->state == B_DROP) f = 6 + ((G.frame >> 2) & 1);
+        else if (b->state == B_JUMP || b->state == B_RISE) f = 8 + ((b->vy > 0) ? 1 : 0);
+        else if (b->state == B_RECOVER) f = 7;
+        else f = (G.frame >> 4) & 3;
+        if (PX(b->y) + BOSS_S >= 440) wsprite(S_SHADOW_L, PX(b->x) + BOSS_S / 2, PX(b->y) + BOSS_S + 5, 0, 0);
+        wsprite(S_BOSS0_0 + b->id * 12 + f, PX(b->x) + BOSS_S / 2, PX(b->y) + BOSS_S, b->face ? 1 : 0, b->flash || (b->state == B_WIND && (b->timer & 4)));
     }
     for (i = 0; i < MAX_PROJ; i++) {
         Proj *q = &G.pr[i];
@@ -233,23 +263,60 @@ static void draw_entities(void) {
     }
 }
 
+/* Rush leaves a short trail of lilac silhouettes. This is display only, so it is not part of the game state. */
+#define GHOSTS 5
+static struct { int16_t x, y, id; uint8_t flip, life; } ghosts[GHOSTS];
+static uint8_t ghost_i;
+
+static int player_frame(void) {
+    Player *p = &G.p;
+    if (p->dead) {
+        int t = (90 - G.timer) / 5;
+        return S_M_DIE0 + (t > 5 ? 5 : t);
+    }
+    if (p->stun) return p->stun > 7 ? S_M_HURT0 : S_M_HURT1;
+    if (p->heal) return S_M_HEAL0 + ((G.frame >> 3) & 3);
+    if (p->hook) return S_M_HOOK0 + (p->hook < 36);
+    if (p->dash) return S_M_DASH0 + ((RUSH_FRAMES - p->dash) >> 1 > 3 ? 3 : (RUSH_FRAMES - p->dash) >> 1);
+    if (p->cleave) return p->cleave < 5 ? S_M_CLEAVE0 : p->cleave < 9 ? S_M_CLEAVE1 : S_M_CLEAVE2 + ((G.frame >> 1) & 1);
+    if (p->atk) {
+        int k = (14 - p->atk) / 2;
+        if (k > 6) k = 6;
+        return ((p->swing & 1) ? S_M_ATKA0 : S_M_ATKB0) + k;
+    }
+    if (!p->ground) {
+        if (p->vy < -1200) return S_M_RISE0;
+        if (p->vy < -350) return S_M_RISE1;
+        if (p->vy < 350) return S_M_APEX;
+        return p->vy < 1200 ? S_M_FALL0 : S_M_FALL1;
+    }
+    if (p->vx > 60 || p->vx < -60) return S_M_RUN0 + ((G.frame >> 1) % 10);
+    if (p->land) return p->land > 6 ? S_M_LAND0 : p->land > 3 ? S_M_LAND1 : S_M_LAND2;
+    return S_M_IDLE0 + ((G.frame >> 3) & 7);
+}
+
 static void draw_player(void) {
     Player *p = &G.p;
-    int f, px = PX(p->x) + PW / 2, py = PX(p->y) + PH;
-    if (p->dead) return;
-    if (p->hurt && !p->stun && ((p->hurt >> 2) & 1)) return;
-    if (p->stun) f = S_M_HURT;
-    else if (p->heal) f = S_M_HEAL0 + ((G.frame >> 4) & 1);
-    else if (p->hook) f = S_M_HOOK;
-    else if (p->dash) f = S_M_DASH0 + ((G.frame >> 2) & 1);
-    else if (p->cleave) f = S_M_CLEAVE0 + ((G.frame >> 2) & 1);
-    else if (p->atk) f = S_M_ATK0 + (p->atk > 11 ? 0 : p->atk > 9 ? 1 : p->atk > 6 ? 2 : p->atk > 3 ? 3 : 4);
-    else if (!p->ground) f = p->vy < 0 ? S_M_RISE : S_M_FALL;
-    else if (p->vx > 60 || p->vx < -60) f = S_M_RUN0 + ((G.frame >> 2) & 7);
-    else f = S_M_IDLE0 + ((G.frame >> 5) & 3);
+    int f, i, px = PX(p->x) + PW / 2, py = PX(p->y) + PH;
+    f = player_frame();
+    if (p->dash && !(G.frame & 1)) {
+        ghosts[ghost_i].x = (int16_t)px; ghosts[ghost_i].y = (int16_t)py; ghosts[ghost_i].id = (int16_t)f;
+        ghosts[ghost_i].flip = p->face; ghosts[ghost_i].life = 12;
+        ghost_i = (uint8_t)((ghost_i + 1) % GHOSTS);
+    }
+    for (i = 0; i < GHOSTS; i++)
+        if (ghosts[i].life) {
+            blit_ghost = 2 + ghosts[i].life;
+            wsprite(ghosts[i].id, ghosts[i].x, ghosts[i].y, ghosts[i].flip, 0);
+            blit_ghost = 0;
+            ghosts[i].life--;
+        }
+    if (p->dead && G.timer < 20) return;
+    if (!p->dead && p->hurt && !p->stun && ((p->hurt >> 2) & 1)) return;
+    if (p->ground && !p->dead) wsprite(S_SHADOW_S, px, py + 5, 0, 0);
     if (p->hook) {
         const Ent *e = &rooms[G.room].ent[p->hook_i];
-        int ax = e->tx * TS + 8, ay = e->ty * TS + 8, i, cy = py - PH / 2;
+        int ax = e->tx * TS + 8, ay = e->ty * TS + 8, cy = py - PH / 2;
         for (i = 1; i < 7; i++)
             wsprite(S_LINK, px + (ax - px) * i / 7, cy + (ay - cy) * i / 7 + 6, 0, 0);
     }
@@ -260,9 +327,14 @@ static void draw_parts(void) {
     int i;
     for (i = 0; i < MAX_PART; i++) {
         Part *t = &G.pt[i];
+        int k;
         if (!t->life) continue;
-        if (t->kind == 0) wsprite(S_SPARK0 + (t->life > 8 ? 0 : t->life > 4 ? 1 : 2), t->x, t->y + 20, 0, 0);
-        else wsprite(S_MOTE0 + ((t->life >> 3) & 1), t->x, t->y + 5, 0, 0);
+        switch (t->kind) {
+        case 0: k = t->life > 9 ? 0 : t->life > 6 ? 1 : t->life > 3 ? 2 : 3; wsprite(S_SPARK0 + k, t->x, t->y, 0, 0); break;
+        case 2: k = t->life > 9 ? 0 : t->life > 6 ? 1 : t->life > 3 ? 2 : 3; wsprite(S_DUST0 + k, t->x, t->y, 0, 0); break;
+        case 3: k = t->life > 12 ? 0 : t->life > 8 ? 1 : t->life > 4 ? 2 : 3; wsprite(S_SHOCK0 + k, t->x, t->y, 0, 0); break;
+        default: wsprite(S_MOTE0 + ((t->life >> 3) & 1), t->x, t->y + 6, 0, 0); break;
+        }
     }
 }
 
@@ -318,15 +390,18 @@ static void dialog_box(void) {
     int on_bot = PX(G.p.y) + PH / 2 >= BOT_Y;
     uint16_t *fb = on_bot ? &fb_top[0][0] : &fb_bot[0][0];
     int fw = on_bot ? SW : BW, fh = SH;
-    int w = 304, h = 68, x0 = (fw - w) / 2, y0 = fh - h - 12;
+    int w = 308, h = 78, x0 = (fw - w) / 2, y0 = fh - h - 10;
     char buf[140];
     const char *pg = text_pages[text_first[G.dlg_id] + G.dlg_page];
     int n = G.dlg_pos < 139 ? G.dlg_pos : 139;
-    fill_a(fb, fw, x0 - 2, y0 - 2, w + 4, h + 4, rgb(168, 120, 200), 26);
-    fill_a(fb, fw, x0, y0, w, h, rgb(14, 10, 26), 28);
+    fill_a(fb, fw, x0 - 2, y0 - 2, w + 4, h + 4, rgb(168, 120, 200), 28);
+    fill_a(fb, fw, x0, y0, w, h, rgb(14, 10, 26), 29);
+    /* the speaker's portrait, with a small nod while the words appear */
+    fill_a(fb, fw, x0 + 5, y0 + 6, 66, 66, rgb(52, 42, 84), 28);
+    blit_fb(fb, fw, fh, S_PORT0 + text_who[G.dlg_id], x0 + 6, y0 + 7 + ((G.dlg_pos < G.dlg_len && ((G.frame >> 2) & 1)) ? 1 : 0), 0, 0);
     memcpy(buf, pg, (size_t)n);
     buf[n] = 0;
-    text(fb, fw, fh, &font_small, x0 + 8, y0 + 7, buf, rgb(244, 236, 250));
+    text(fb, fw, fh, &font_small, x0 + 77, y0 + 9, buf, rgb(244, 236, 250));
     if (G.dlg_pos >= G.dlg_len && (G.frame & 16))
         text(fb, fw, fh, &font_mid, x0 + w - 16, y0 + h - 22, ">", rgb(255, 235, 150));
 }

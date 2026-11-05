@@ -44,7 +44,7 @@
 
 #define MAX_EN 6
 #define MAX_PROJ 10
-#define MAX_PART 12
+#define MAX_PART 20
 
 enum { M_TITLE, M_PLAY, M_DIALOG, M_PAUSE, M_FADEOUT, M_FADEIN, M_DEATH, M_ENDING, M_CREDITS };
 
@@ -55,7 +55,7 @@ enum { P_DROP, P_WAVE, P_ORB };
 typedef struct {
     int32_t x, y, vx, vy, safe_x, safe_y;
     uint8_t face, ground, coyote, jbuf, hp, maxhp, echo, hurt, stun, atk, atk_cd, swing;
-    uint8_t dash, dash_cd, air_dash, air_jump, heal, dead, boost, cleave, hook, hook_i, hook_last, drop_t;
+    uint8_t dash, dash_cd, air_dash, air_jump, heal, dead, boost, cleave, hook, hook_i, hook_last, drop_t, land;
 } Player;
 
 typedef struct {

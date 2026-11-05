@@ -94,6 +94,9 @@ void player_update(void) {
     int32_t nx, ny;
 
     if (p->hurt) p->hurt--;
+    if (p->land) p->land--;
+    if (p->ground && !p->stun && !p->dash && (p->vx > 500 || p->vx < -500) && (G.frame & 19) == 0)
+        part_spawn(2, PX(p->x) + (p->vx > 0 ? 8 : PW - 8), PX(p->y) + PH, p->vx > 0 ? -1 : 1, 0, 12);
     if (p->boost && (p->vy >= 0 || !--p->boost)) p->boost = 0;
     if (p->atk_cd) p->atk_cd--;
     if (p->dash_cd) p->dash_cd--;
@@ -128,6 +131,7 @@ void player_update(void) {
         p->vy = 0;
         if (!p->dash) { p->vx = p->face ? -300 : 300; p->dash_cd = 16; }
     } else if (p->cleave) {
+        if (p->cleave < 250) p->cleave++;
         p->vy = CLEAVE_V;
         p->vx = dir * 200;
     } else {
@@ -166,6 +170,7 @@ void player_update(void) {
             }
             if (!jumped && PRESSED(K_A) && !p->ground && HAS(F_CLOAK) && !p->air_jump) {
                 p->air_jump = 1;
+                p->land = 0;
                 p->jbuf = 0;
                 p->vy = -AIRJUMP_V;
                 sfx(SFX_JUMP);
@@ -188,6 +193,7 @@ void player_update(void) {
                 p->jbuf = 0;
                 p->atk = 0;
                 if (!p->ground) p->air_dash = 1;
+                part_spawn(2, PX(p->x) + PW / 2, PX(p->y) + PH - 2, p->face ? 2 : -2, 0, 14);
                 sfx(SFX_RUSH);
             }
             {
@@ -268,10 +274,18 @@ void player_update(void) {
                     if (p->cleave) {
                         break_crack();
                         p->cleave = 0;
-                        p->atk = 8;
+                        p->land = 9;
                         G.shake = 6;
                         sfx(SFX_SLAM);
-                    } else if (p->vy > 1200) sfx(SFX_LAND);
+                        part_spawn(3, PX(p->x) + PW / 2, PX(p->y) + PH, 0, 0, 16);
+                        part_spawn(2, PX(p->x) + 4, PX(p->y) + PH, -2, 0, 16);
+                        part_spawn(2, PX(p->x) + PW - 4, PX(p->y) + PH, 2, 0, 16);
+                    } else if (p->vy > 500) {
+                        p->land = 9;
+                        if (p->vy > 1200) sfx(SFX_LAND);
+                        part_spawn(2, PX(p->x) + 6, PX(p->y) + PH, -1, 0, 14);
+                        part_spawn(2, PX(p->x) + PW - 6, PX(p->y) + PH, 1, 0, 14);
+                    }
                     p->vy = 0;
                     break;
                 }

@@ -43,24 +43,42 @@ def add_sprite(name, im, ax=None, ay=None):
     sprites.append((name, w, h, box[0] - ax, box[1] - ay, off, aoff))
 
 
-for nm, im in A.player_frames().items():
-    add_sprite('M_' + nm, im, 64, 92)
-for ei, fn in enumerate(A.ENEMY_ART):
-    for f in range(4):
-        add_sprite('EN%d_%d' % (ei, f), fn(f / 4))
-for ni, fn in enumerate(A.NPC_ART):
-    for f in range(2):
-        add_sprite('NPC%d_%d' % (ni, f), fn(f / 2 + .25))
-for b, fn in enumerate(A.BOSS_ART):
-    for f in range(6):
-        add_sprite('BOSS%d_%d' % (b, f), fn(f).resize((96, 96), Image.LANCZOS))
-for nm, im in (('IT_RUSH', A.item_rush()), ('IT_HOOK', A.item_hook()), ('IT_CLEAVE', A.item_cleave()), ('IT_CLOAK', A.item_cloak()),
-               ('IT_SHARD0', A.item_shard(0)), ('IT_SHARD1', A.item_shard(1)), ('IT_WHET', A.item_whet()), ('BELL0', A.item_bell(0)), ('BELL1', A.item_bell(1)),
-               ('SBELL_OFF', A.small_bell(0)), ('SBELL_ON', A.small_bell(1)), ('HEART_FULL', A.heart(1)), ('HEART_EMPTY', A.heart(0)),
-               ('DROP0', A.proj_drop(0)), ('DROP1', A.proj_drop(1)), ('WAVE0', A.proj_wave(0)), ('WAVE1', A.proj_wave(1)), ('ORB0', A.proj_orb(0)), ('ORB1', A.proj_orb(1)),
-               ('SPARK0', A.spark(0)), ('SPARK1', A.spark(1)), ('SPARK2', A.spark(2)), ('MOTE0', A.mote(0)), ('MOTE1', A.mote(1)),
-               ('LINK', A.hook_link()), ('RING0', A.anchor_ring(0)), ('RING1', A.anchor_ring(1)), ('UPMARK', A.up_mark())):
-    add_sprite(nm, im)
+# Character art takes a while to render, so it is cached until its source changes.
+art_key = hashlib.sha1(b''.join(open(os.path.join(os.path.dirname(__file__), f), 'rb').read() for f in ('ink.py', 'art.py', 'art_menuel.py'))).hexdigest()
+art_cache = os.path.join(BUILD, 'art_' + art_key + '.pkl')
+if os.path.exists(art_cache):
+    sprite_src = pickle.load(open(art_cache, 'rb'))
+else:
+    sprite_src = []
+    for nm, im in A.player_frames().items():
+        sprite_src.append(('M_' + nm, im, 85, 112))
+    for ei, fr in enumerate(A.enemy_frames()):
+        for f, im in enumerate(fr):
+            sprite_src.append(('EN%d_%d' % (ei, f), im, None, None))
+    for ni, fr in enumerate(A.npc_frames()):
+        for f, im in enumerate(fr):
+            sprite_src.append(('NPC%d_%d' % (ni, f), im, None, None))
+    for bi, fr in enumerate(A.boss_frames()):
+        for f, im in enumerate(fr):
+            sprite_src.append(('BOSS%d_%d' % (bi, f), im, None, None))
+    for i, im in enumerate(A.portraits()):
+        sprite_src.append(('PORT%d' % i, im, 0, 0))
+    for nm, im in (('IT_RUSH', A.item_rush()), ('IT_HOOK', A.item_hook()), ('IT_CLEAVE', A.item_cleave()), ('IT_CLOAK', A.item_cloak()),
+                   ('IT_SHARD0', A.item_shard(0)), ('IT_SHARD1', A.item_shard(1)), ('IT_WHET', A.item_whet()), ('BELL0', A.item_bell(0)), ('BELL1', A.item_bell(1)),
+                   ('SBELL_OFF', A.small_bell(0)), ('SBELL_ON', A.small_bell(1)), ('HEART_FULL', A.heart(1)), ('HEART_EMPTY', A.heart(0)),
+                   ('DROP0', A.proj_drop(0)), ('DROP1', A.proj_drop(1)), ('WAVE0', A.proj_wave(0)), ('WAVE1', A.proj_wave(1)), ('ORB0', A.proj_orb(0)), ('ORB1', A.proj_orb(1)),
+                   ('LINK', A.hook_link()), ('RING0', A.anchor_ring(0)), ('RING1', A.anchor_ring(1)), ('UPMARK', A.up_mark()), ('MOTE0', A.mote(0)), ('MOTE1', A.mote(1)),
+                   ('SHADOW_S', A.shadow(28)), ('SHADOW_M', A.shadow(50)), ('SHADOW_L', A.shadow(96))):
+        sprite_src.append((nm, im, None, None))
+    for i in range(4):
+        sprite_src.append(('SPARK%d' % i, A.spark(i), 24, 24))
+    for i in range(4):
+        sprite_src.append(('DUST%d' % i, A.dust(i), 14, 15))
+    for i in range(4):
+        sprite_src.append(('SHOCK%d' % i, A.ring(i), 32, 13))
+    pickle.dump(sprite_src, open(art_cache, 'wb'))
+for nm, im, ax, ay in sprite_src:
+    add_sprite(nm, im, ax, ay)
 
 
 # dynamic tiles: doors and cracked floors, one per theme
@@ -71,12 +89,12 @@ def dyn_tile(theme, crack):
         p.flat([(0, 0), (16, 0), (16, 16), (0, 16)], A.C(*th['dark']))
         p.flat([(0, 0), (16, 0), (16, 4), (0, 4)], A.C(*th['rim2']))
         for pts in ([(1, 2), (6, 8), (3, 15)], [(9, 0), (7, 7), (13, 12), (11, 16)], [(15, 4), (12, 7)]):
-            p.line(pts, A.INK, 1.1)
+            p.line(pts, A.INK4, 1.1)
     else:
         p.flat([(0, 0), (16, 0), (16, 16), (0, 16)], A.C(*th['plank_d']))
         p.flat([(2, 0), (14, 0), (14, 16), (2, 16)], A.C(*th['plank']))
-        p.line([(0, 0), (0, 16)], A.INK, 1.2); p.line([(15.6, 0), (15.6, 16)], A.INK, 1.2)
-        p.line([(0, 7.5), (16, 7.5)], A.INK, 1)
+        p.line([(0, 0), (0, 16)], A.INK4, 1.2); p.line([(15.6, 0), (15.6, 16)], A.INK4, 1.2)
+        p.line([(0, 7.5), (16, 7.5)], A.INK4, 1)
     return p.done()
 
 
@@ -177,7 +195,7 @@ open(os.path.join(BUILD, 'assets.bin'), 'wb').write(blob)
 
 
 # ------------------------------------------------------------------ text: pixel-accurate wrapping to the 288 px box
-def wrap(pg, width=288, lines=3):
+def wrap(pg, width=232, lines=3):
     out, ls, cur = [], [], ''
     for w_ in pg.split():
         t = (cur + ' ' + w_) if cur else w_
@@ -200,6 +218,18 @@ for n in W.TEXT_ORDER:
         for line in wrap(p):
             pages.append(line.replace('"', '\\"')); k += 1
     count.append(k)
+
+# who is talking on each text: 0-4 people, 5-9 bosses, 10 the narrator (Menuel's own face)
+def speaker(n):
+    for i, w in enumerate(('RINGER', 'MINER', 'CLERK', 'SMITH', 'HERMIT')):
+        if n.startswith(w):
+            return i
+    if n.startswith('BOSS') and n.endswith('_IN'):
+        return 5 + int(n[4])
+    return 10
+
+
+who = [speaker(n) for n in W.TEXT_ORDER]
 
 # ------------------------------------------------------------------ gen.h
 h = ['/* generated by assets/build.py */\n#ifndef GEN_H\n#define GEN_H\n#include <stdint.h>\n']
@@ -226,7 +256,7 @@ typedef struct { uint8_t h; const Glyph *g; } Font;
 extern const SprDef spr_defs[];
 extern const RoomDef rooms[NUM_ROOMS];
 extern const char *const text_pages[];
-extern const uint8_t text_first[], text_count[];
+extern const uint8_t text_first[], text_count[], text_who[];
 extern const Font font_small, font_mid, font_big;
 extern const SongDef songs[];
 #endif
@@ -245,7 +275,7 @@ for i, r in enumerate(W.ROOMS):
                                                              ','.join(map(str, W.tile_rows(r))), room_blobs[i][0], room_blobs[i][1]))
 c.append('};\n')
 c.append('const char *const text_pages[] = {\n' + ''.join('"%s",\n' % p for p in pages) + '};\n')
-c.append('const uint8_t text_first[] = {%s};\nconst uint8_t text_count[] = {%s};\n' % (','.join(map(str, first)), ','.join(map(str, count))))
+c.append('const uint8_t text_first[] = {%s};\nconst uint8_t text_count[] = {%s};\nconst uint8_t text_who[] = {%s};\n' % (','.join(map(str, first)), ','.join(map(str, count)), ','.join(map(str, who))))
 for nm, hh, gl in (('small', small_h, small_g), ('mid', mid_h, mid_g), ('big', big_h, big_g)):
     c.append('static const Glyph g_%s[] = {%s};\nconst Font font_%s = {%d, g_%s};\n' % (nm, ','.join('{%d,%d,%d}' % g for g in gl), nm, hh, nm))
 for i, n in enumerate(M.SONG_ORDER):

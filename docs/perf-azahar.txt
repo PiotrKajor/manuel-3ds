@@ -1,46 +1,46 @@
 units: ms at the 268 MHz tick, budget 16.67 ms per frame
 present avg 3.37 max 3.43
-audio avg 0.38 max 1.49
-worst whole frame 96.87
+audio avg 0.38 max 1.48
+worst whole frame 87.90
 worst step room Old Kiln
-save file write max 88.07
-Ringer's Loft      step avg 2.77 max 20.30
-Bell Stair         step avg 2.78 max 20.36
-Upper Shaft        step avg 2.83 max 20.39
-Old Cache          step avg 2.80 max 20.44
-Salt Gallery       step avg 3.01 max 20.52
-Broken Lift        step avg 2.82 max 20.43
-Miner's Rest       step avg 3.01 max 20.59
-Rush Shrine        step avg 2.80 max 20.41
-Crystal Span       step avg 3.07 max 20.66
-Foreman's Pit      step avg 3.67 max 20.67
-Water Gate         step avg 2.92 max 20.86
-Flooded Nave       step avg 2.82 max 20.59
-Rope Walk          step avg 2.75 max 20.55
-Undercroft         step avg 2.62 max 20.57
-Hook Shrine        step avg 3.36 max 20.72
-Drowned Archive    step avg 3.19 max 20.91
-Sunk Vault         step avg 2.71 max 20.60
-Hanging Bells      step avg 3.02 max 20.68
-Choir Loft         step avg 2.65 max 20.77
-Spire Walk         step avg 2.96 max 20.71
-Rope Chamber       step avg 3.74 max 20.96
-Slag Door          step avg 2.85 max 20.19
-Blast Hall         step avg 2.83 max 20.10
-Crane Bay          step avg 3.07 max 20.30
-Casting Floor      step avg 2.90 max 20.19
-Cleave Forge       step avg 3.08 max 20.11
-Old Kiln           step avg 3.43 max 92.71
-Scrap Tower        step avg 3.12 max 20.25
-Cinder Run         step avg 3.56 max 20.13
-Founder's Hall     step avg 3.83 max 12.30
-Quench Room        step avg 2.69 max 19.92
-Anvil Room         step avg 3.72 max 20.27
-Cold Stair         step avg 2.77 max 20.28
-Wind Ledge         step avg 2.72 max 20.18
-Frozen Chapel      step avg 3.66 max 20.32
-Hush Pass          step avg 2.78 max 20.23
-Cloak Cairn        step avg 2.88 max 20.19
-High Shelf         step avg 2.83 max 20.07
-Last Lantern       step avg 2.72 max 20.17
-Silent Belfry      step avg 3.75 max 20.33
+save file write max 77.91
+Ringer's Loft      step avg 3.17 max 20.56
+Bell Stair         step avg 3.12 max 20.56
+Upper Shaft        step avg 3.18 max 20.72
+Old Cache          step avg 3.04 max 20.56
+Salt Gallery       step avg 3.43 max 20.92
+Broken Lift        step avg 3.14 max 20.63
+Miner's Rest       step avg 3.46 max 20.94
+Rush Shrine        step avg 3.12 max 20.74
+Crystal Span       step avg 3.51 max 20.99
+Foreman's Pit      step avg 4.52 max 21.33
+Water Gate         step avg 3.35 max 21.17
+Flooded Nave       step avg 3.04 max 20.78
+Rope Walk          step avg 3.03 max 20.75
+Undercroft         step avg 2.87 max 20.72
+Hook Shrine        step avg 3.65 max 20.99
+Drowned Archive    step avg 3.53 max 21.04
+Sunk Vault         step avg 3.03 max 20.78
+Hanging Bells      step avg 3.30 max 20.99
+Choir Loft         step avg 2.97 max 20.92
+Spire Walk         step avg 3.35 max 20.93
+Rope Chamber       step avg 4.56 max 21.50
+Slag Door          step avg 3.34 max 20.53
+Blast Hall         step avg 3.26 max 20.50
+Crane Bay          step avg 3.50 max 20.69
+Casting Floor      step avg 3.35 max 20.52
+Cleave Forge       step avg 3.60 max 20.49
+Old Kiln           step avg 3.86 max 83.73
+Scrap Tower        step avg 3.59 max 20.57
+Cinder Run         step avg 4.10 max 20.47
+Founder's Hall     step avg 4.81 max 13.03
+Quench Room        step avg 3.00 max 20.15
+Anvil Room         step avg 4.63 max 20.90
+Cold Stair         step avg 3.05 max 20.45
+Wind Ledge         step avg 2.99 max 20.42
+Frozen Chapel      step avg 4.01 max 20.52
+Hush Pass          step avg 3.03 max 20.40
+Cloak Cairn        step avg 3.32 max 20.48
+High Shelf         step avg 3.15 max 20.24
+Last Lantern       step avg 3.04 max 20.44
+Silent Belfry      step avg 4.70 max 20.97

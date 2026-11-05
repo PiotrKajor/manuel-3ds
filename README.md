@@ -96,7 +96,7 @@ make 3ds                        # build/Menuel.3dsx i build/Menuel.cia
 Cała gra to zwykły C bez zależności od sprzętu. Rysuje programowo do buforów RGB565 z półprzezroczystością, a warstwa konsoli tylko je wyświetla, czyta przyciski i ekran dotykowy i gra dźwięk przez NDSP. Dzięki temu te same piksele powstają na konsoli i w testach.
 
 ```
-assets/  art.py (postacie), bake.py (malowane tła), world.py (pokoje i teksty), music.py, build.py
+assets/  ink.py (silnik rysunku), art_menuel.py, art.py (postacie), bake.py (malowane tła), world.py (pokoje i teksty), music.py, build.py
 src/     game.c, player.c, enemy.c, boss.c, render.c, audio.c
          plat_3ds.c (konsola), host.c (biblioteka do testów)
 tests/   t_world, t_boss, t_full, t_misc, make_media
@@ -104,7 +104,7 @@ tools/   budowanie .3dsx i .cia
 docs/    spec.md, rysunek Menuela, zrzuty i gify
 ```
 
-Postacie są rysowane wektorowo z grubym konturem, w dużym rozmiarze, a następnie zmniejszane do klatek z gładkimi krawędziami. Ruch powstaje przez przesuwanie i obracanie części ciała. Każdy pokój jest malowany przy budowaniu (tekstury, światło, cienie, dekoracje) i przechowywany w postaci skompresowanej LZ4. Muzyka też powstaje ze skryptu. Ilustracja na ekranie tytułowym i ikona pochodzą z rysunku Menuela (`docs/menuel-reference.png`).
+Postacie powstają w małym silniku do tuszowania (`assets/ink.py`): gładkie krzywe, gruba kreska na obrysie, cienka w środku i cieniowanie z jednego kierunku światła. Menuel ma 62 klatki, m.in. 8 klatek spoczynku z mrugnięciem, 10 klatek biegu, dwa różne zamachy ze smugą, przygotowanie i lądowanie ze ściskaniem, a także śmierć. Każdy szpic peleryny porusza się z własnym opóźnieniem. Wrogowie mają po 6 klatek, bossowie po 12, postacie mówiące mają portrety w dialogach, a w grze dochodzą duchy zrywu, kurz, fale uderzeniowe i cienie. Każdy pokój jest malowany przy budowaniu (tekstury, światło, cienie, dekoracje) i przechowywany w postaci skompresowanej LZ4. Muzyka też powstaje ze skryptu. Ilustracja na ekranie tytułowym i ikona pochodzą z rysunku Menuela (`docs/menuel-reference.png`).
 
 ## Testy
 
@@ -125,7 +125,7 @@ Pomiar kodu ARM w emulatorze Azahar, 240 klatek w każdym z 40 pokoi, budżet kl
 
 | Co | Średnio | Najwięcej |
 |---|---:|---:|
-| Logika i rysowanie | 3,0 ms | ok. 21 ms (rozpakowanie pokoju, w czasie wygaszenia ekranu) |
+| Logika i rysowanie | 3,5 ms | ok. 21 ms (rozpakowanie pokoju, w czasie wygaszenia ekranu) |
 | Kopiowanie na oba ekrany | 3,4 ms | 3,4 ms |
 | Dźwięk | 0,4 ms | 1,5 ms |
 | Zapis na kartę (tylko latarnia i przedmioty) | | ok. 90 ms |

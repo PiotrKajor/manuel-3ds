@@ -75,6 +75,7 @@ void kill_fx(int x, int y) {
     part_spawn(1, x - 8, y, -1, -1, 24);
     part_spawn(1, x + 8, y, 1, -1, 24);
     part_spawn(1, x, y - 6, 0, -2, 20);
+    part_spawn(2, x, y + 8, 0, 0, 14);
 }
 
 /* ------------------------------------------------------------ rooms */
