@@ -1,4 +1,4 @@
-/* Menuel - 2DS XL / 3DS layer: input, framebuffers, NDSP audio, save file */
+/* Manuel - 2DS XL / 3DS layer: input, framebuffers, NDSP audio, save file */
 #include <3ds.h>
 #include <stdio.h>
 #include <malloc.h>
@@ -9,7 +9,7 @@
 extern const uint8_t assets_bin[];
 __asm__(".section .rodata\n.balign 4\n.global assets_bin\nassets_bin:\n.incbin \"build/assets.bin\"\n.previous\n");
 
-#define SAVE_DIR "sdmc:/3ds/Menuel"
+#define SAVE_DIR "sdmc:/3ds/Manuel"
 #define SAVE_PATH SAVE_DIR "/save.bin"
 #define AUDIO_SAMPLES 1024
 #define AUDIO_BUFS 4
@@ -37,6 +37,8 @@ void plat_save(const void *data, int len) {
 
 int plat_load(void *data, int len) {
     FILE *f = fopen(SAVE_PATH, "rb");
+    /* saves written before the name was corrected */
+    if (!f) f = fopen("sdmc:/3ds/Me" "nuel/save.bin", "rb");
     int ok = 0;
     if (f) { ok = fread(data, 1, (size_t)len, f) == (size_t)len; fclose(f); }
     return ok;
@@ -110,7 +112,7 @@ static uint16_t read_keys(void) {
 #define TICKS_PER_MS (SYSCLOCK_ARM11 / 1000.0)
 
 #ifdef BENCH
-/* Benchmark build: drives every room with scripted input and writes sdmc:/3ds/Menuel/perf.txt */
+/* Benchmark build: drives every room with scripted input and writes sdmc:/3ds/Manuel/perf.txt */
 static const uint16_t script[] = { K_RIGHT, K_RIGHT | K_A, K_RIGHT | K_B, K_RIGHT, K_LEFT | K_B, K_LEFT, K_LEFT | K_A, K_B };
 void host_setup_bench(int room) {
     uint8_t fl[8];

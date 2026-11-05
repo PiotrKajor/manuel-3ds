@@ -1,4 +1,4 @@
-/* Menuel - enemies and projectiles */
+/* Manuel - enemies and projectiles */
 #include "core.h"
 
 /* art order: MITE MOTH FROG BELLFISH BEETLE FURNACE WRAITH HARE */

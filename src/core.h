@@ -1,4 +1,4 @@
-/* Menuel and the Last Bell - platform free game core */
+/* Manuel and the Last Bell - platform free game core */
 #ifndef CORE_H
 #define CORE_H
 #include <stdint.h>

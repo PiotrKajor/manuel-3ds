@@ -1,4 +1,4 @@
-/* Menuel - small chiptune synth: lead square, bass triangle, noise drums, two sfx voices */
+/* Manuel - small chiptune synth: lead square, bass triangle, noise drums, two sfx voices */
 #include "core.h"
 
 #define TICK_HZ 60

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Wraps build/Menuel.elf into an installable CIA. Downloads makerom and bannertool once.
+# Wraps build/Manuel.elf into an installable CIA. Downloads makerom and bannertool once.
 set -e
 cd "$(dirname "$0")/.."
 T=tools/cia
@@ -18,6 +18,6 @@ if [ ! -x "$T/bannertool" ]; then
 fi
 .venv/bin/python tools/make_wav.py build/banner.wav
 "$T/bannertool" makebanner -i build/banner.png -a build/banner.wav -o build/banner.bnr
-"$T/bannertool" makesmdh -s "Menuel and the Last Bell" -l "Menuel and the Last Bell" -p "Menuel project" -i build/icon.png -o build/icon.icn
-"$T/makerom" -f cia -o build/Menuel.cia -rsf tools/menuel.rsf -target t -exefslogo -elf build/Menuel.elf -icon build/icon.icn -banner build/banner.bnr
-ls -la build/Menuel.cia
+"$T/bannertool" makesmdh -s "Manuel and the Last Bell" -l "Manuel and the Last Bell" -p "Manuel project" -i build/icon.png -o build/icon.icn
+"$T/makerom" -f cia -o build/Manuel.cia -rsf tools/manuel.rsf -target t -exefslogo -elf build/Manuel.elf -icon build/icon.icn -banner build/banner.bnr
+ls -la build/Manuel.cia

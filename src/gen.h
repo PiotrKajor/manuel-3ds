@@ -342,15 +342,24 @@
 #define S_SHOCK1 248
 #define S_SHOCK2 249
 #define S_SHOCK3 250
-#define S_DOOR0 251
-#define S_CRACK0 252
-#define S_DOOR1 253
-#define S_CRACK1 254
-#define S_DOOR2 255
-#define S_CRACK2 256
-#define S_DOOR3 257
-#define S_CRACK3 258
-#define S_TITLE 259
+#define S_COVER_M0 251
+#define S_COVER_M1 252
+#define S_COVER_M2 253
+#define S_COVER_M3 254
+#define S_COVER_M4 255
+#define S_COVER_M5 256
+#define S_COVER_BELL0 257
+#define S_COVER_BELL1 258
+#define S_COVER_BELL2 259
+#define S_COVER_BELL3 260
+#define S_DOOR0 261
+#define S_CRACK0 262
+#define S_DOOR1 263
+#define S_CRACK1 264
+#define S_DOOR2 265
+#define S_CRACK2 266
+#define S_DOOR3 267
+#define S_CRACK3 268
 #define MAX_ENTS 14
 typedef struct { uint16_t w, h; int16_t ox, oy; uint32_t off, aoff; } SprDef;
 typedef struct { uint8_t type, tx, ty, arg, arg2; } Ent;
@@ -360,6 +369,7 @@ typedef struct { uint8_t w, adv; uint32_t off; } Glyph;
 typedef struct { uint8_t h; const Glyph *g; } Font;
 extern const SprDef spr_defs[];
 extern const RoomDef rooms[NUM_ROOMS];
+extern const uint32_t cover_off[2], cover_len[2];
 extern const char *const text_pages[];
 extern const uint8_t text_first[], text_count[], text_who[];
 extern const Font font_small, font_mid, font_big;

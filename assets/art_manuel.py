@@ -1,4 +1,4 @@
-"""Menuel himself, redrawn after the user's drawing, and his full animation set."""
+"""Manuel himself, redrawn after the user's drawing, and his full animation set."""
 import math
 from ink import *
 

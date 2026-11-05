@@ -1,4 +1,4 @@
-/* Menuel - modes, rooms, collision, saving */
+/* Manuel - modes, rooms, collision, saving */
 #include "core.h"
 
 Game G;
@@ -379,8 +379,8 @@ static void update_title(void) {
     if (PRESSED(K_DOWN)) { G.menu = (uint8_t)((G.menu + 1) % n); sfx(SFX_SELECT); }
     if (PRESSED(K_A | K_START)) { title_choose(G.menu); return; }
     if (G.touch && !G.touch_old) {
-        int i = (G.ty - 70) / 44;
-        if (G.ty >= 70 && i < n) { G.menu = (uint8_t)i; title_choose(i); }
+        int i = (G.ty - 134) / 34;
+        if (G.ty >= 134 && G.tx >= 66 && G.tx < 254 && i < n) { G.menu = (uint8_t)i; title_choose(i); }
     }
 }
 

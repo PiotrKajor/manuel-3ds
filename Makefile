@@ -1,18 +1,18 @@
 # make            assets and the host test library
-# make 3ds        build/Menuel.3dsx and build/Menuel.cia (devkitARM runs in a podman container)
+# make 3ds        build/Manuel.3dsx and build/Manuel.cia (devkitARM runs in a podman container)
 PY = .venv/bin/python
 CORE = src/game.c src/player.c src/enemy.c src/boss.c src/render.c src/audio.c src/gen_world.c
 HDRS = src/core.h src/gen.h
 IMG = docker.io/devkitpro/devkitarm:latest
-TITLE = Menuel and the Last Bell
-AUTHOR = Menuel project
+TITLE = Manuel and the Last Bell
+AUTHOR = Manuel project
 
-all: build/libmenuel.so
+all: build/libmanuel.so
 
-build/assets.bin src/gen.h src/gen_world.c: assets/art.py assets/bake.py assets/world.py assets/music.py assets/build.py docs/menuel-reference.png
+build/assets.bin src/gen.h src/gen_world.c: assets/art.py assets/bake.py assets/world.py assets/music.py assets/build.py docs/manuel-reference.png
 	$(PY) assets/build.py
 
-build/libmenuel.so: $(CORE) src/host.c $(HDRS) build/assets.bin
+build/libmanuel.so: $(CORE) src/host.c $(HDRS) build/assets.bin
 	gcc -O2 -Wall -Wno-unused-function -fPIC -shared -include stddef.h -o $@ $(CORE) src/host.c
 
 3ds: build/assets.bin src/gen.h src/gen_world.c

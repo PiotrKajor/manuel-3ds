@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/media/01_tytul.png" width="400" alt="Menuel and the Last Bell">
+<img src="docs/media/01_tytul.png" width="400" alt="Manuel and the Last Bell">
 
-# Menuel and the Last Bell
+# Manuel and the Last Bell
 
 **Natywna metroidvania na New 2DS XL / 3DS, napisana w C od zera**
 
@@ -14,11 +14,11 @@
 </div>
 
 Dzwony Podziemnego Miasta umilkły, a wraz z nimi jego mieszkańcy zapominają, kim są.
-W zakurzonym lofcie budzi się Menuel, mały strażnik w masce w kształcie latawca.
+W zakurzonym lofcie budzi się Manuel, mały strażnik w masce w kształcie latawca.
 Bierze topór, schodzi w dół i po kolei budzi cztery dzwony, aż dociera do tego, kto je uciszył.
 
 **40 pokoi na dwa ekrany · 4 krainy · 5 bossów · 4 zdolności · 4 odłamki zdrowia · osełka · 9 utworów · zapis przy latarniach.**
-Każdy pokój obejmuje oba ekrany: Menuel skacze i spada z górnego na dolny, a bossowie atakują przez oba. Tekst w grze jest po angielsku. To nie jest ROM do emulatora: gra działa bezpośrednio na konsoli.
+Każdy pokój obejmuje oba ekrany: Manuel skacze i spada z górnego na dolny, a bossowie atakują przez oba. Tekst w grze jest po angielsku. To nie jest ROM do emulatora: gra działa bezpośrednio na konsoli.
 
 | Eksploracja na dwóch ekranach | Hak nad Hanging Bells |
 |:-:|:-:|
@@ -34,10 +34,10 @@ Konsola musi mieć custom firmware (np. Luma3DS). Pliki są w [`release/`](relea
 
 | Plik | Jak użyć |
 |---|---|
-| [`Menuel.cia`](release/Menuel.cia) | Skopiuj na kartę SD i zainstaluj w FBI. Gra pojawi się na ekranie HOME. |
-| [`Menuel.3dsx`](release/Menuel.3dsx) | Skopiuj do `/3ds/Menuel/` i uruchom z Homebrew Launchera. |
+| [`Manuel.cia`](release/Manuel.cia) | Skopiuj na kartę SD i zainstaluj w FBI. Gra pojawi się na ekranie HOME. |
+| [`Manuel.3dsx`](release/Manuel.3dsx) | Skopiuj do `/3ds/Manuel/` i uruchom z Homebrew Launchera. |
 
-- **Zapis:** `sdmc:/3ds/Menuel/save.bin`. Obie wersje korzystają z tego samego pliku.
+- **Zapis:** `sdmc:/3ds/Manuel/save.bin`. Obie wersje korzystają z tego samego pliku.
 - **Dźwięk:** wymaga `/3ds/dspfirm.cdc`. Bez tego pliku gra działa, tylko bez dźwięku.
 
 ## Sterowanie
@@ -65,7 +65,7 @@ Konsola musi mieć custom firmware (np. Luma3DS). Pliki są w [`release/`](relea
 | Rust Foundry | 11 | Cleave | Two-Headed Founder, The Anvil |
 | Summit of Silence | 8 | Cloak | Silent Ringer |
 
-Górny ekran pokazuje pełną szerokość pokoju, a dolny jego niższą część. Serca podążają za Menuelem na ekran, na którym jest, a dialogi pojawiają się na tym drugim, żeby niczego nie zasłaniać. Przycisk START wyświetla na dolnym ekranie mapę odwiedzonych pokoi, latarnie, bossów, zdolności i dzwony.
+Górny ekran pokazuje pełną szerokość pokoju, a dolny jego niższą część. Serca podążają za Manuelem na ekran, na którym jest, a dialogi pojawiają się na tym drugim, żeby niczego nie zasłaniać. Przycisk START wyświetla na dolnym ekranie mapę odwiedzonych pokoi, latarnie, bossów, zdolności i dzwony.
 
 ## Zrzuty ekranu
 
@@ -87,7 +87,7 @@ Wymagane: Python 3 w `.venv`, czcionki Noto Serif, gcc, podman (kompilator devki
 ```sh
 python3 -m venv .venv && .venv/bin/python -m pip install pillow numpy scipy lz4
 make                            # assety i biblioteka testowa
-make 3ds                        # build/Menuel.3dsx i build/Menuel.cia
+make 3ds                        # build/Manuel.3dsx i build/Manuel.cia
 .venv/bin/python tests/t_full.py   # pełne przejście gry
 ```
 
@@ -96,15 +96,15 @@ make 3ds                        # build/Menuel.3dsx i build/Menuel.cia
 Cała gra to zwykły C bez zależności od sprzętu. Rysuje programowo do buforów RGB565 z półprzezroczystością, a warstwa konsoli tylko je wyświetla, czyta przyciski i ekran dotykowy i gra dźwięk przez NDSP. Dzięki temu te same piksele powstają na konsoli i w testach.
 
 ```
-assets/  ink.py (silnik rysunku), art_menuel.py, art.py (postacie), bake.py (malowane tła), world.py (pokoje i teksty), music.py, build.py
+assets/  ink.py (silnik rysunku), art_manuel.py, art.py (postacie), bake.py (malowane tła), world.py (pokoje i teksty), music.py, build.py
 src/     game.c, player.c, enemy.c, boss.c, render.c, audio.c
          plat_3ds.c (konsola), host.c (biblioteka do testów)
 tests/   t_world, t_boss, t_full, t_misc, make_media
 tools/   budowanie .3dsx i .cia
-docs/    spec.md, rysunek Menuela, zrzuty i gify
+docs/    spec.md, rysunek Manuela, zrzuty i gify
 ```
 
-Postacie powstają w małym silniku do tuszowania (`assets/ink.py`): gładkie krzywe, gruba kreska na obrysie, cienka w środku i cieniowanie z jednego kierunku światła. Menuel ma 62 klatki, m.in. 8 klatek spoczynku z mrugnięciem, 10 klatek biegu, dwa różne zamachy ze smugą, przygotowanie i lądowanie ze ściskaniem, a także śmierć. Każdy szpic peleryny porusza się z własnym opóźnieniem. Wrogowie mają po 6 klatek, bossowie po 12, postacie mówiące mają portrety w dialogach, a w grze dochodzą duchy zrywu, kurz, fale uderzeniowe i cienie. Każdy pokój jest malowany przy budowaniu (tekstury, światło, cienie, dekoracje) i przechowywany w postaci skompresowanej LZ4. Muzyka też powstaje ze skryptu. Ilustracja na ekranie tytułowym i ikona pochodzą z rysunku Menuela (`docs/menuel-reference.png`).
+Postacie powstają w małym silniku do tuszowania (`assets/ink.py`): gładkie krzywe, gruba kreska na obrysie, cienka w środku i cieniowanie z jednego kierunku światła. Manuel ma 62 klatki, m.in. 8 klatek spoczynku z mrugnięciem, 10 klatek biegu, dwa różne zamachy ze smugą, przygotowanie i lądowanie ze ściskaniem, a także śmierć. Każdy szpic peleryny porusza się z własnym opóźnieniem. Wrogowie mają po 6 klatek, bossowie po 12, postacie mówiące mają portrety w dialogach, a w grze dochodzą duchy zrywu, kurz, fale uderzeniowe i cienie. Każdy pokój jest malowany przy budowaniu (tekstury, światło, cienie, dekoracje) i przechowywany w postaci skompresowanej LZ4. Muzyka też powstaje ze skryptu. Wygląd Manuela opiera się na rysunku `docs/manuel-reference.png`. Okładka (`assets/cover.py`) to malowana scena na oba ekrany, w której Manuel i dzwon są animowani.
 
 ## Testy
 

@@ -1,4 +1,4 @@
-"""Menuel - rooms and text. A room spans both screens: 25x30 tiles of 16 px, 400x480 in all.
+"""Manuel - rooms and text. A room spans both screens: 25x30 tiles of 16 px, 400x480 in all.
 The top screen shows rows 0-14 at full width. The bottom screen shows rows 15-29, columns 2.5 to 22.5,
 so the lower half has thick side walls and "shoulders" at y=240 on both sides of the top screen."""
 W, H = 25, 30
@@ -34,8 +34,8 @@ def text(name, *pages):
 
 text('INTRO', "The bells of the Undertown have gone quiet.",
      "Without them the city forgets itself, one street at a time.",
-     "In a dusty loft, a small warden in a kite-shaped mask opens its eyes. Its name is Menuel.")
-text('RINGER1', "Oh! You are awake, Menuel. Good. I am too old to climb.",
+     "In a dusty loft, a small warden in a kite-shaped mask opens his eyes. His name is Manuel.")
+text('RINGER1', "Oh! You are awake, Manuel. Good. I am too old to climb.",
      "Four bells keep this place alive. Something has stolen their voices.",
      "Take your axe. Wake the bells. Start in the Salt Mines, up the ledges and to the right.")
 text('RINGER2', "The lanterns still burn. Rest by one and it will remember you.",
@@ -80,7 +80,7 @@ text('BOSS1_OUT', "The rope goes slack. The second bell answers the first.")
 text('BOSS2_OUT', "The brothers fall quiet, and for once they agree. The way on is open.")
 text('BOSS3_OUT', "The Anvil splits. The third bell sounds through the iron. The way up is open.")
 text('BOSS4_OUT', "The Ringer lays down its hands. The last bell hangs in front of you, silent.")
-text('ENDING', "Menuel takes the axe and strikes the bell itself.",
+text('ENDING', "Manuel takes the axe and strikes the bell itself.",
      "The note rolls down the mountain, through iron and water and salt.",
      "All across the Undertown, people remember their names.",
      "The little warden sits down and listens for a while.")

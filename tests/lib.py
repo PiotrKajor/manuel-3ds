@@ -11,7 +11,7 @@ ENT_LANTERN, ENT_ABILITY, ENT_SHARD, ENT_WHET, ENT_BOSS, ENT_CRACK, ENT_BELL = 2
 
 class Game:
     def __init__(self):
-        self.L = ctypes.CDLL(os.path.join(ROOT, 'build', 'libmenuel.so'))
+        self.L = ctypes.CDLL(os.path.join(ROOT, 'build', 'libmanuel.so'))
         self.L.host_fb_top.restype = ctypes.c_void_p
         self.L.host_fb_bot.restype = ctypes.c_void_p
         self.L.host_clear_save()

@@ -1,4 +1,4 @@
-/* Menuel - the five bosses. Arenas span both screens: the fight happens on the lower floor,
+/* Manuel - the five bosses. Arenas span both screens: the fight happens on the lower floor,
    and Rope Drowned, The Anvil and the Silent Ringer take it up onto the top screen. */
 #include "core.h"
 
@@ -91,7 +91,7 @@ void boss_update(void) {
 
     switch (b->state) {
     case B_SLEEP:
-        /* wait until Menuel is clear of the entry door, so it cannot shut on the player */
+        /* wait until Manuel is clear of the entry door, so it cannot shut on the player */
         if (G.p.ground && PX(G.p.y) > 340 && PX(G.p.x) + HX >= 3 * TS + 4) {
             close_boss_entry();
             b->state = b->id == 1 ? B_HOVER : B_IDLE;

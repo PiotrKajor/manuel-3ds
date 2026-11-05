@@ -1,4 +1,4 @@
-/* Menuel - software renderer. The world spans both screens; sprites are drawn to whichever screens they touch. */
+/* Manuel - software renderer. The world spans both screens; sprites are drawn to whichever screens they touch. */
 #include "core.h"
 
 #define RUSH_FRAMES 14
@@ -354,7 +354,7 @@ static void dim_both(int level) {
     dim(&fb_bot[0][0], BW * BH, level);
 }
 
-/* The HUD follows Menuel to whichever screen it is on. */
+/* The HUD follows Manuel to whichever screen it is on. */
 static void hud(void) {
     Player *p = &G.p;
     int on_bot = PX(p->y) + PH / 2 >= BOT_Y;
@@ -385,7 +385,7 @@ static void hud(void) {
     }
 }
 
-/* Dialogue goes on the screen Menuel is not on, so nothing is covered. */
+/* Dialogue goes on the screen Manuel is not on, so nothing is covered. */
 static void dialog_box(void) {
     int on_bot = PX(G.p.y) + PH / 2 >= BOT_Y;
     uint16_t *fb = on_bot ? &fb_top[0][0] : &fb_bot[0][0];
@@ -464,12 +464,19 @@ static void render_map(void) {
     }
 }
 
-static void title_bg(void) {
-    /* the summit room's painted sky serves both title screens */
-    const RoomDef *r = &rooms[NUM_ROOMS - 1];
-    if (bg_room != NUM_ROOMS - 1) { lz4_decode(blob8 + r->bg_off, r->bg_len, (uint8_t *)bg); bg_room = NUM_ROOMS - 1; }
+/* The cover: a painted scene with Manuel in the wind and the bell swinging as animated layers. */
+static void cover_scene(int which) {
+    static const uint8_t cyc[8] = { 0, 1, 2, 3, 4, 3, 2, 1 };
+    uint8_t id = (uint8_t)(250 + which);
+    int f = (int)(G.frame >> 3);
+    if (bg_room != id) { lz4_decode(blob8 + cover_off[which], cover_len[which], (uint8_t *)bg); bg_room = id; }
     shx = shy = 0;
     copy_bg();
+    wsprite(S_COVER_BELL0 + ((G.frame >> 4) & 3), 200, 250, 0, 0);
+    /* the blink frame is shown only now and then */
+    if ((G.frame & 511) < 12) wsprite(S_COVER_M4, -52, 4, 0, 0);
+    else wsprite(S_COVER_M0 + (f & 1 ? cyc[(f >> 1) & 7] % 4 : cyc[(f >> 1) & 7] % 4), -52, 4, 0, 0);
+    ambient(3);
 }
 
 void render_text_bot(int x, int y, const char *s) { text(&fb_bot[0][0], BW, BH, &font_small, x, y, s, 0xFFE0); }
@@ -483,24 +490,22 @@ void render(void) {
         if (has) items[n++] = "Continue";
         items[n++] = "New Game";
         items[n++] = "Exit";
-        title_bg();
-        blit_fb(&fb_top[0][0], SW, SH, S_TITLE, 4, 24, 0, 0);
-        shadow_text(&fb_top[0][0], SW, SH, &font_big, 262, 92, "Menuel", rgb(244, 236, 250));
-        shadow_text(&fb_top[0][0], SW, SH, &font_mid, 250, 140, "and the Last Bell", rgb(190, 170, 230));
+        cover_scene(0);
         for (i = 0; i < n; i++) {
-            int y = 70 + i * 44, sel = i == G.menu;
-            fill_a(&fb_bot[0][0], BW, 50, y, 220, 38, sel ? rgb(120, 92, 170) : rgb(14, 10, 26), 24);
-            text(&fb_bot[0][0], BW, BH, &font_mid, (BW - text_width(&font_mid, items[i])) / 2, y + 8, items[i], sel ? rgb(255, 235, 150) : rgb(220, 210, 240));
+            int y = 134 + i * 34, sel = i == G.menu;
+            uint16_t edge = sel ? rgb(246, 200, 104) : rgb(96, 76, 120);
+            fill_a(&fb_bot[0][0], BW, 66, y - 1, 188, 32, edge, sel ? 30 : 20);
+            fill_a(&fb_bot[0][0], BW, 68, y + 1, 184, 28, sel ? rgb(58, 40, 62) : rgb(18, 14, 30), 28);
+            text(&fb_bot[0][0], BW, BH, &font_mid, (BW - text_width(&font_mid, items[i])) / 2, y + 4, items[i], sel ? rgb(255, 235, 170) : rgb(214, 204, 234));
         }
         return;
     }
     if (G.mode == M_CREDITS) {
-        title_bg();
-        blit_fb(&fb_top[0][0], SW, SH, S_TITLE, 0, 8, 0, 0);
-        shadow_text(&fb_top[0][0], SW, SH, &font_big, 250, 70, "The End", rgb(244, 236, 250));
-        shadow_text(&fb_bot[0][0], BW, BH, &font_mid, 60, 70, "Menuel and the Last Bell", rgb(220, 210, 240));
-        shadow_text(&fb_bot[0][0], BW, BH, &font_small, 90, 100, "Thank you for playing", rgb(190, 170, 230));
-        if (G.timer > 60) shadow_text(&fb_bot[0][0], BW, BH, &font_mid, 106, 180, "Press Start", rgb(255, 235, 150));
+        cover_scene(1);
+        shadow_text(&fb_top[0][0], SW, SH, &font_big, 232, 88, "The End", rgb(255, 236, 170));
+        shadow_text(&fb_top[0][0], SW, SH, &font_small, 238, 134, "Manuel and the Last Bell", rgb(226, 216, 244));
+        shadow_text(&fb_top[0][0], SW, SH, &font_small, 248, 152, "Thank you for playing", rgb(190, 170, 230));
+        if (G.timer > 60) shadow_text(&fb_bot[0][0], BW, BH, &font_mid, 110, 150, "Press Start", rgb(255, 235, 150));
         return;
     }
     if (G.bg_dirty || bg_room != G.room) render_bg();

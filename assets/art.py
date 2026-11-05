@@ -1,8 +1,8 @@
-"""Menuel - the cast: enemies, people, bosses, items and effects, drawn with the inking engine."""
+"""Manuel - the cast: enemies, people, bosses, items and effects, drawn with the inking engine."""
 import math
 from PIL import Image, ImageDraw
 from ink import *
-from art_menuel import player_frames, head as menuel_head, body as menuel_body
+from art_manuel import player_frames, head as manuel_head, body as manuel_body
 
 
 class Pen:
@@ -695,8 +695,8 @@ def portraits():
     for fn, c in zip(BOSS_ART, ((14, 0, 114, 100), (12, 0, 116, 104), (6, 0, 122, 116), (0, 8, 128, 136), (14, 0, 114, 100))):
         out.append(fn(0).crop(c).resize((64, 64), Image.LANCZOS))
     a = Art(64, 64)
-    menuel_body(a, 32, 76, 0, 1, 1, .2, (1.1, 1.1))
-    menuel_head(a, 32, 8, 0, 1, (1.15, 1.15))
+    manuel_body(a, 32, 76, 0, 1, 1, .2, (1.1, 1.1))
+    manuel_head(a, 32, 8, 0, 1, (1.15, 1.15))
     out.append(a.done())
     return out
 

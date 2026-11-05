@@ -1,4 +1,4 @@
-"""Menuel - a small inking engine. Shapes are smooth splines. Each part gets a thick outer contour, thin inner lines
+"""Manuel - a small inking engine. Shapes are smooth splines. Each part gets a thick outer contour, thin inner lines
 and automatic cel shading from one light direction (upper left), which is what makes the characters read as drawn."""
 import math
 import numpy as np

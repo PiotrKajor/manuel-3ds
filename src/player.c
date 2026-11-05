@@ -1,4 +1,4 @@
-/* Menuel - movement, abilities, interaction */
+/* Manuel - movement, abilities, interaction */
 #include "core.h"
 
 #define WALK_ACC 64

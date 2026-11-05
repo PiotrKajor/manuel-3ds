@@ -1,4 +1,4 @@
-"""Menuel - original chiptune songs. Notes C2..B6, R is a rest, name:ticks."""
+"""Manuel - original chiptune songs. Notes C2..B6, R is a rest, name:ticks."""
 NOTE = {'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11}
 
 

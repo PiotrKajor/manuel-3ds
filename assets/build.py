@@ -9,6 +9,7 @@ import art as A
 import world as W
 import music as M
 import bake as B
+import cover as CV
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 BUILD = os.path.join(ROOT, 'build')
@@ -44,7 +45,7 @@ def add_sprite(name, im, ax=None, ay=None):
 
 
 # Character art takes a while to render, so it is cached until its source changes.
-art_key = hashlib.sha1(b''.join(open(os.path.join(os.path.dirname(__file__), f), 'rb').read() for f in ('ink.py', 'art.py', 'art_menuel.py'))).hexdigest()
+art_key = hashlib.sha1(b''.join(open(os.path.join(os.path.dirname(__file__), f), 'rb').read() for f in ('ink.py', 'art.py', 'art_manuel.py', 'cover.py'))).hexdigest()
 art_cache = os.path.join(BUILD, 'art_' + art_key + '.pkl')
 if os.path.exists(art_cache):
     sprite_src = pickle.load(open(art_cache, 'rb'))
@@ -76,6 +77,10 @@ else:
         sprite_src.append(('DUST%d' % i, A.dust(i), 14, 15))
     for i in range(4):
         sprite_src.append(('SHOCK%d' % i, A.ring(i), 32, 13))
+    for i, im in enumerate(CV.hero_frames()):
+        sprite_src.append(('COVER_M%d' % i, im, 0, 0))
+    for i, im in enumerate(CV.bell_frames()):
+        sprite_src.append(('COVER_BELL%d' % i, im, im.width // 2, 0))
     pickle.dump(sprite_src, open(art_cache, 'wb'))
 for nm, im, ax, ay in sprite_src:
     add_sprite(nm, im, ax, ay)
@@ -103,50 +108,13 @@ for th in range(4):
     add_sprite('CRACK%d' % th, dyn_tile(th, 1), 0, 0)
 
 
-# ------------------------------------------------------------------ the user's drawing, cleaned
-def clean_reference():
-    im = Image.open(os.path.join(ROOT, 'docs', 'menuel-reference.png')).convert('RGB')
-    w, h = im.size
-    px = im.load()
-    mask = Image.new('L', im.size, 255)
-    mp = mask.load()
-    stack = [(x, y) for x in range(w) for y in (0, h - 1)] + [(x, y) for y in range(h) for x in (0, w - 1)]
-    while stack:
-        x, y = stack.pop()
-        if not (0 <= x < w and 0 <= y < h) or mp[x, y] == 0:
-            continue
-        r, g, b = px[x, y]
-        if min(r, g, b) < 235:
-            continue
-        mp[x, y] = 0
-        stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-    d = ImageDraw.Draw(mask)
-    d.rectangle((0, 170, 24, h), fill=0)
-    d.rectangle((340, 280, w, h), fill=0)
-    # keep only the largest connected shape: Menuel with the axe, not bits of neighbouring figures
-    from scipy import ndimage as nd
-    arr = np.array(mask) > 0
-    lab, n = nd.label(arr)
-    sizes = nd.sum(arr, lab, range(1, n + 1))
-    keep = lab == (int(np.argmax(sizes)) + 1)
-    mask = Image.fromarray((keep * 255).astype('uint8')).filter(ImageFilter.GaussianBlur(.5))
-    out = im.convert('RGBA')
-    out.putalpha(mask)
-    return out.crop(mask.point(lambda v: 255 if v > 8 else 0).getbbox())
-
-
-ref = clean_reference()
-scale = 196 / ref.height
-add_sprite('TITLE', ref.resize((int(ref.width * scale), 196), Image.LANCZOS), 0, 0)
-icon = Image.new('RGBA', (48, 48), (28, 22, 48, 255))
-small = ref.resize((int(ref.width * 46 / ref.height), 46), Image.LANCZOS)
-small = small.crop((0, 0, 48, 46)) if small.width > 48 else small
-icon.alpha_composite(small, ((48 - small.width) // 2, 1))
-icon.save(os.path.join(BUILD, 'icon.png'))
-banner = Image.new('RGBA', (256, 128), (28, 22, 48, 255))
-bs = ref.resize((int(ref.width * 120 / ref.height), 120), Image.LANCZOS)
-banner.alpha_composite(bs, ((256 - bs.width) // 2, 4))
-banner.save(os.path.join(BUILD, 'banner.png'))
+# ------------------------------------------------------------------ cover: painted backdrops, icon and banner
+cover_title = CV.paint(True)
+cover_end = CV.paint(False)
+hero0 = dict((n, im) for n, im, _, _ in sprite_src)['COVER_M0']
+CV.icon(hero0).save(os.path.join(BUILD, 'icon.png'))
+shot = CV.composite(cover_title, hero0).crop((0, 0, 400, 200)).resize((256, 128), Image.LANCZOS)
+shot.save(os.path.join(BUILD, 'banner.png'))
 
 
 # ------------------------------------------------------------------ fonts: alpha glyphs, variable width
@@ -191,6 +159,13 @@ for i, r in enumerate(W.ROOMS):
     room_blobs.append((len(blob), len(data)))
     blob.extend(data)
 
+cover_blobs = []
+for img in (cover_title, cover_end):
+    data = lz4.block.compress(B.to565(img).tobytes(), store_size=False, mode='high_compression', compression=9)
+    while len(blob) % 4:
+        blob.append(0)
+    cover_blobs.append((len(blob), len(data)))
+    blob.extend(data)
 open(os.path.join(BUILD, 'assets.bin'), 'wb').write(blob)
 
 
@@ -219,7 +194,7 @@ for n in W.TEXT_ORDER:
             pages.append(line.replace('"', '\\"')); k += 1
     count.append(k)
 
-# who is talking on each text: 0-4 people, 5-9 bosses, 10 the narrator (Menuel's own face)
+# who is talking on each text: 0-4 people, 5-9 bosses, 10 the narrator (Manuel's own face)
 def speaker(n):
     for i, w in enumerate(('RINGER', 'MINER', 'CLERK', 'SMITH', 'HERMIT')):
         if n.startswith(w):
@@ -255,6 +230,7 @@ typedef struct { uint8_t w, adv; uint32_t off; } Glyph;
 typedef struct { uint8_t h; const Glyph *g; } Font;
 extern const SprDef spr_defs[];
 extern const RoomDef rooms[NUM_ROOMS];
+extern const uint32_t cover_off[2], cover_len[2];
 extern const char *const text_pages[];
 extern const uint8_t text_first[], text_count[], text_who[];
 extern const Font font_small, font_mid, font_big;
@@ -266,6 +242,7 @@ open(os.path.join(ROOT, 'src', 'gen.h'), 'w').write(''.join(h))
 # ------------------------------------------------------------------ gen_world.c
 c = ['/* generated by assets/build.py */\n#include "gen.h"\n']
 c.append('const SprDef spr_defs[] = {\n' + ''.join('{%d,%d,%d,%d,%d,%d},\n' % s[1:] for s in sprites) + '};\n')
+c.append('const uint32_t cover_off[2] = {%d,%d};\nconst uint32_t cover_len[2] = {%d,%d};\n' % (cover_blobs[0][0], cover_blobs[1][0], cover_blobs[0][1], cover_blobs[1][1]))
 c.append('const RoomDef rooms[NUM_ROOMS] = {\n')
 for i, r in enumerate(W.ROOMS):
     assert len(r.ents) <= 14, (r.key, len(r.ents))

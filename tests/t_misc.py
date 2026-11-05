@@ -48,6 +48,15 @@ g.settle()
 assert g.room() == 0 and g.mode() == M_PLAY
 print('continue after restart ok')
 
+# the menu also answers to touch: tap Continue on the lower screen
+assert g.L.host_init(os.path.join(ROOT, 'build', 'assets.bin').encode())
+g.L.host_set_headless(1)
+g.step(0, 5)
+g.touch(1, 160, 140); g.step(0, 1); g.touch(0, 160, 140)
+g.settle()
+assert g.mode() == M_PLAY and g.room() == 0, 'tap on the menu'
+print('touch menu ok')
+
 # pause and back
 g.tap(START); assert g.mode() == M_PAUSE
 g.tap(START); assert g.mode() == M_PLAY

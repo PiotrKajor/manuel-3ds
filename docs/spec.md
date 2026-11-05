@@ -1,8 +1,8 @@
-# Menuel and the Last Bell: spec
+# Manuel and the Last Bell: spec
 
 Native homebrew for the user's 2DS XL (`.cia` for the HOME Menu, `.3dsx` for the Homebrew
-Launcher). No GBC emulator is involved. Menuel is the user's character
-(`docs/menuel-reference.png`). World, story, enemies, art and music are original to this
+Launcher). No GBC emulator is involved. Manuel is the user's character
+(`docs/manuel-reference.png`). World, story, enemies, art and music are original to this
 project. In-game text is English.
 
 ## Technology
@@ -12,7 +12,7 @@ project. In-game text is English.
   same game as a shared library for tests.
 - Sound: own chiptune synth through NDSP (needs `/3ds/dspfirm.cdc`, present on the user's card).
   Without it the game runs silently.
-- Save: `sdmc:/3ds/Menuel/save.bin`.
+- Save: `sdmc:/3ds/Manuel/save.bin`.
 
 ## Content
 - 40 two-screen rooms (25x30 tiles of 16 px) in four areas: Salt Mines, Drowned Belfry,
@@ -22,7 +22,7 @@ project. In-game text is English.
   floors), Cloak (second jump).
 - Upgrades: four bell shards (+1 max health each), whetstone (double axe damage).
 - Lanterns save the game and heal.
-- Pause shows the map, abilities and bells on the bottom screen. Health follows Menuel, dialogue uses the other screen.
+- Pause shows the map, abilities and bells on the bottom screen. Health follows Manuel, dialogue uses the other screen.
 
 ## Controls
 | Input | Action |

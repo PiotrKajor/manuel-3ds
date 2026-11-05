@@ -1,4 +1,4 @@
-"""Menuel - paints each room's 400x480 background: backdrop, textured terrain, ledges, hazards, props and light."""
+"""Manuel - paints each room's 400x480 background: backdrop, textured terrain, ledges, hazards, props and light."""
 import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
