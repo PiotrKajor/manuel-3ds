@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
             {
                 int tx, b, first_alive = 5;
                 for (tx = 1; tx < RW - 1; tx++)
-                    if (rooms[room].t[12 * RW + tx] == T_EMPTY && rooms[room].t[11 * RW + tx] == T_EMPTY && rooms[room].t[12 * RW + tx + 1] == T_EMPTY && rooms[room].t[13 * RW + tx] == T_ROCK) break;
+                    if (rooms[room].t[27 * RW + tx] == T_EMPTY && rooms[room].t[26 * RW + tx] == T_EMPTY && rooms[room].t[25 * RW + tx] == T_EMPTY && rooms[room].t[27 * RW + tx + 1] == T_EMPTY && rooms[room].t[28 * RW + tx] == T_ROCK) break;
                 for (b = 0; b < 5; b++) { fl[F_BOSS0 >> 3] &= (uint8_t)~(1 << ((F_BOSS0 + b) & 7)); }
                 {
                     int i2, own = -1;
@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
                     if (!strcmp(rooms[room].name, "QUENCH ROOM")) first_alive = 3;
                     for (b = 0; b < first_alive; b++) fl[(F_BOSS0 + b) >> 3] |= (uint8_t)(1 << ((F_BOSS0 + b) & 7));
                 }
-                host_setup(room, tx < RW - 1 ? tx : 3, 12, 3 + (int)(r32() % 7), fl);
+                host_setup(room, tx < RW - 1 ? tx : 10, 27, 3 + (int)(r32() % 7), fl);
             }
         }
         core_step(keys);
@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
         if (G.mode == M_DEATH && G.timer == 90) deaths++;
         if (G.mode == M_PLAY) {
             int px = PX(G.p.x), py = PX(G.p.y);
-            if (px < -40 || px > SW + 40 || py < -60 || py > SH + 60) { oob++; if (oob < 10) printf("out of bounds room %d at %d,%d\n", G.room, px, py); }
+            if (px < -40 || px > WW + 40 || py < -60 || py > WH + 60) { oob++; if (oob < 10) printf("out of bounds room %d at %d,%d\n", G.room, px, py); }
             if (G.p.hp > G.p.maxhp) hpbad++;
             /* setup() puts the player on a fixed tile, which may be inside rock: only count real entries */
             if (last_entry_frames > 30 && box_solid(px + HX, py + HY, HW, HH)) { embedded++; embed_by_room[G.room]++; }

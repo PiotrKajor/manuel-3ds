@@ -1,4 +1,4 @@
-"""Plays the game again and records the screenshots and GIFs used by the README."""
+"""Plays the game again and records the screenshots and GIFs used by the README. GIFs show both screens."""
 import sys, os, ctypes
 sys.path.insert(0, os.path.dirname(__file__))
 from lib import *
@@ -9,24 +9,29 @@ import world as W
 
 OUT = os.path.join(ROOT, 'docs', 'media')
 os.makedirs(OUT, exist_ok=True)
+for f in os.listdir(OUT):
+    os.remove(os.path.join(OUT, f))
 ROOM = W.ROOM_KEYS
 g = Game()
 s = Search(g)
 
 
-def top():
+def screens():
+    def conv(buf, w, h):
+        a = np.frombuffer(buf, dtype='<u2').reshape(h, w)
+        return np.dstack([((a >> 11) & 31) * 255 // 31, ((a >> 5) & 63) * 255 // 63, (a & 31) * 255 // 31]).astype('uint8')
     g.L.host_render()
-    buf = ctypes.string_at(g.L.host_fb_top(), 400 * 240 * 2)
-    raw = bytearray(400 * 240 * 3)
-    for i in range(400 * 240):
-        c = buf[i * 2] | (buf[i * 2 + 1] << 8)
-        raw[i * 3] = (c >> 11) << 3; raw[i * 3 + 1] = ((c >> 5) & 63) << 2; raw[i * 3 + 2] = (c & 31) << 3
-    return Image.frombytes('RGB', (400, 240), bytes(raw))
+    im = Image.new('RGB', (400, 480))
+    im.paste(Image.fromarray(conv(ctypes.string_at(g.L.host_fb_top(), 400 * 240 * 2), 400, 240)), (0, 0))
+    im.paste(Image.fromarray(conv(ctypes.string_at(g.L.host_fb_bot(), 320 * 240 * 2), 320, 240)), (40, 240))
+    return im
+
+
+import numpy as np
 
 
 def both(name):
-    g.shot(name)
-    os.replace(os.path.join(ROOT, 'preview', name + '.png'), os.path.join(OUT, name + '.png'))
+    screens().save(os.path.join(OUT, name + '.png'))
 
 
 class Rec:
@@ -36,25 +41,28 @@ class Rec:
     def __call__(self):
         self.n += 1
         if self.n > self.start and self.n <= self.start + self.limit and self.n % self.every == 0:
-            self.f.append(top().convert('P', palette=Image.ADAPTIVE, colors=64))
+            self.f.append(screens().resize((300, 360), Image.LANCZOS).convert('P', palette=Image.ADAPTIVE, colors=96))
 
     def save(self, name):
         self.f[0].save(os.path.join(OUT, name + '.gif'), save_all=True, append_images=self.f[1:], duration=50, loop=0, optimize=True)
         print(name, len(self.f), 'frames', os.path.getsize(os.path.join(OUT, name + '.gif')) // 1024, 'KB', flush=True)
 
 
+def allowed(key):
+    th = {W.ROOMS[g.room()].theme, W.ROOMS[ROOM[key]].theme}
+    return {i for i, r in enumerate(W.ROOMS) if r.theme in th}
+
+
 def walk(goal, key):
     g.set_god(1)
-    th = {W.ROOMS[g.room()].theme, W.ROOMS[ROOM[key]].theme}
-    assert s.search(goal, allowed={i for i, r in enumerate(W.ROOMS) if r.theme in th}) is not None, key
+    assert s.search(goal, allowed=allowed(key)) is not None, key
     g.set_god(0)
 
 
 def walk_recorded(goal, key, rec):
     start = g.snap()
     g.set_god(1)
-    th = {W.ROOMS[g.room()].theme, W.ROOMS[ROOM[key]].theme}
-    path = s.search(goal, allowed={i for i, r in enumerate(W.ROOMS) if r.theme in th})
+    path = s.search(goal, allowed=allowed(key))
     assert path is not None, key
     g.restore(start)
     for m in path:
@@ -89,13 +97,14 @@ def room(key):
     return lambda: g.room() == r
 
 
-def boss(key, name, rec=None, shot_hp=None):
+def boss(key, name, maxhp, rec=None):
     walk(room(key), key)
     g.settle()
     for _ in range(400):
         g.step(RIGHT)
         if g.mode() == M_DIALOG:
             break
+    assert g.mode() == M_DIALOG, name
     g.step(0, 60)
     both(name + '_intro')
     g.settle()
@@ -104,7 +113,8 @@ def boss(key, name, rec=None, shot_hp=None):
         if rec:
             rec()
         hp = g.boss_hp()
-        if hp and hp * 2 <= G_MAX[key] and 'mid' not in shots and any(g.pr(i, 0) for i in range(10)):
+        st = g.boss_state()
+        if hp and hp * 2 <= maxhp and 'mid' not in shots and any(g.pr(i, 0) for i in range(10)):
             shots['mid'] = 1
             both(name + '_walka')
     won, hp, fr = duel(g, frame)
@@ -112,25 +122,21 @@ def boss(key, name, rec=None, shot_hp=None):
     g.settle()
 
 
-G_MAX = dict(pit=20, rope=26, founder=30, anvil=26, summit=44)
 g.step(0, 30)
-g.L.host_set_headless(0)
-g.step(0, 1)
 both('01_tytul')
-g.L.host_set_headless(1)
 g.tap(A)
 g.step(0, 120)
 both('02_intro')
 g.settle()
 g.step(0, 30)
 both('03_start')
-rec = Rec(0, 300)
+rec = Rec(0, 330)
 walk_recorded(item('shrine'), 'shrine', rec)
 rec.save('walk_salt_mines')
 g.settle()
 both('04_rush_shrine')
-rec = Rec(240, 240)
-boss('pit', 'boss1', rec)
+rec = Rec(300, 240)
+boss('pit', 'boss1', 20, rec)
 rec.save('boss_foreman')
 walk(item('hookroom'), 'hookroom'); g.settle()
 g.step(0, 20)
@@ -139,17 +145,23 @@ rec = Rec(0, 360)
 walk_recorded(room('choir'), 'choir', rec)
 rec.save('hook_hanging_bells')
 g.settle()
-boss('rope', 'boss2')
+rec = Rec(300, 300)
+boss('rope', 'boss2', 26, rec)
+rec.save('boss_rope')
 walk(item('forge'), 'forge'); g.settle()
 g.step(0, 20)
 both('06_rust_foundry')
-boss('founder', 'boss3')
-boss('anvil', 'boss4')
+boss('founder', 'boss3', 30)
+boss('anvil', 'boss4', 26)
 walk(item('cairn'), 'cairn'); g.settle()
 g.step(0, 20)
 both('07_summit')
+g.tap(START)
+g.step(0, 2)
+both('10_pauza_mapa')
+g.tap(START)
 rec = Rec(600, 240)
-boss('summit', 'boss5', rec)
+boss('summit', 'boss5', 44, rec)
 rec.save('boss_ringer')
 g.step(0, 40)
 both('08_last_bell')

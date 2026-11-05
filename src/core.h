@@ -10,8 +10,11 @@
 #define BW 320
 #define BH 240
 #define TS 16
-#define RW 25
-#define RH 15
+#define WW 400
+#define WH 480
+/* the bottom screen shows world x 40..359, y 240..479 */
+#define BOT_X 40
+#define BOT_Y 240
 #define FP 8                 /* positions are in 1/256 pixel */
 #define PX(v) ((v) >> FP)
 
@@ -27,17 +30,24 @@
 #define K_L 512
 #define K_X 1024
 
-/* player box inside the 32x32 sprite */
-#define HX 9
-#define HW 14
-#define HY 4
-#define HH 28
+/* player reference box is 32x48, feet at y+48 */
+#define PW 32
+#define PH 48
+#define HX 7
+#define HW 18
+#define HY 6
+#define HH 42
+/* enemy art is 56x48, boss art 96x96 */
+#define EW 56
+#define EH 48
+#define BOSS_S 96
 
 #define MAX_EN 6
 #define MAX_PROJ 10
 #define MAX_PART 12
 
 enum { M_TITLE, M_PLAY, M_DIALOG, M_PAUSE, M_FADEOUT, M_FADEIN, M_DEATH, M_ENDING, M_CREDITS };
+
 enum { B_SLEEP, B_IDLE, B_WIND, B_CHARGE, B_JUMP, B_RECOVER, B_STUN, B_HOVER, B_DROP, B_RISE, B_THROW, B_RING, B_DEAD };
 enum { SFX_JUMP, SFX_AXE, SFX_HIT, SFX_HURT, SFX_RUSH, SFX_HEAL, SFX_PICKUP, SFX_SAVE, SFX_BLIP, SFX_ROAR, SFX_DIE, SFX_SLAM, SFX_KILL, SFX_SELECT, SFX_LAND, SFX_HOOK, SFX_BELL };
 enum { P_DROP, P_WAVE, P_ORB };
@@ -90,7 +100,9 @@ typedef struct {
     int8_t near_i;
     uint8_t dlg_id, dlg_page, dlg_after;
     uint16_t dlg_pos, dlg_len;
-    uint8_t menu, title_t, bg_dirty, bot_dirty, bot_dirty_seen, timer, song, msg_t;
+    uint8_t menu, title_t, bg_dirty, timer, song, msg_t;
+    int16_t tx, ty;
+    uint8_t touch, touch_old;
     const char *msg;
     uint16_t counters[4];    /* deaths, kills, hits taken, frames/3600 */
 } Game;
@@ -114,6 +126,7 @@ int plat_load(void *data, int len);
 /* game.c */
 void core_init(const void *blob);
 void core_step(uint16_t keys);
+void core_touch(int active, int x, int y);
 uint32_t rnd(void);
 uint8_t cell(int tx, int ty);
 uint8_t solid_at(int px, int py);
@@ -159,7 +172,7 @@ void boss_box(int *x, int *y, int *w, int *h);
 /* render.c */
 void render(void);
 void render_bg(void);
-void draw_text(uint16_t *fb, int stride, int maxh, int x, int y, const char *s, uint16_t col, int scale);
+void render_text_bot(int x, int y, const char *s);
 uint16_t rgb(int r, int g, int b);
 
 /* audio.c */

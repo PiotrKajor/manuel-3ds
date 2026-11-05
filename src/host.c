@@ -44,7 +44,8 @@ void host_clear_save(void) { saved_len = 0; }
 void *host_fb_top(void) { return fb_top; }
 void *host_fb_bot(void) { return fb_bot; }
 void host_audio(int16_t *out, int n) { audio_fill(out, n); }
-int host_render(void) { G.bg_dirty = 1; G.bot_dirty = 1; render(); return 0; }
+int host_render(void) { render(); return 0; }
+void host_touch(int a, int x, int y) { core_touch(a, x, y); }
 
 /* read-only views for the tests */
 int host_mode(void) { return G.mode; }

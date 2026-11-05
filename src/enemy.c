@@ -17,8 +17,8 @@ void spawn_enemy(uint8_t kind, int tx, int ty) {
             e->on = 1;
             e->kind = kind;
             e->hp = en_hp[kind];
-            e->x = (int32_t)(tx * TS - 8) * (1 << FP);
-            e->y = (int32_t)(ty * TS - 16) * (1 << FP);
+            e->x = (int32_t)(tx * TS + 8 - EW / 2) * (1 << FP);
+            e->y = (int32_t)((ty + 1) * TS - EH) * (1 << FP);
             e->oy = e->y;
             e->dir = (uint8_t)(tx & 1);
             e->timer = (uint8_t)(tx * 7);
@@ -29,49 +29,53 @@ void spawn_enemy(uint8_t kind, int tx, int ty) {
 void enemy_hit(Enemy *e, int dmg) {
     e->hp = e->hp > dmg ? (uint8_t)(e->hp - dmg) : 0;
     e->flash = 8;
-    e->vx = G.p.face ? -700 : 700;
+    e->vx = G.p.face ? -800 : 800;
     e->state |= 0x80;
     sfx(SFX_HIT);
-    part_spawn(0, PX(e->x) + 16, PX(e->y) + 16, 0, 0, 12);
-    if (G.p.echo < 99) { G.p.echo = G.p.echo > 88 ? 99 : G.p.echo + 11; G.bot_dirty = 1; }
+    part_spawn(0, PX(e->x) + EW / 2, PX(e->y) + EH / 2, 0, 0, 12);
+    if (G.p.echo < 99) G.p.echo = G.p.echo > 88 ? 99 : G.p.echo + 11;
     G.hitstop = 3;
     if (!e->hp) {
-        kill_fx(PX(e->x) + 16, PX(e->y) + 16);
+        kill_fx(PX(e->x) + EW / 2, PX(e->y) + EH / 2);
         e->on = 0;
         G.counters[1]++;
     }
 }
 
+static int standing(int ex, int ey) {
+    uint8_t c = cell((ex + EW / 2) >> 4, (ey + EH) >> 4);
+    return !((ey + EH) & 15) && (box_solid(ex + 8, ey + EH, EW - 16, 1) || c == T_ONEWAY);
+}
+
 static void update_one(Enemy *e) {
     int ex = PX(e->x), ey = PX(e->y);
-    int pcx = PX(G.p.x) + 16, pcy = PX(G.p.y) + 16;
-    int dx = pcx - (ex + 16), dy = pcy - (ey + 16);
+    int pcx = PX(G.p.x) + PW / 2, pcy = PX(G.p.y) + PH / 2;
+    int dx = pcx - (ex + EW / 2), dy = pcy - (ey + EH / 2);
     uint8_t beh = en_beh[e->kind];
     if (e->flash) e->flash--;
     if (e->state & 0x80) {
-        /* knockback */
         int nx = PX(e->x + e->vx);
-        if (!box_solid(nx + 4, ey + 8, 24, 20)) e->x += e->vx;
+        if (!box_solid(nx + 8, ey + 10, EW - 16, EH - 14)) e->x += e->vx;
         e->vx = e->vx * 3 / 4;
         if (e->vx > -80 && e->vx < 80) { e->vx = 0; e->state &= 0x7F; }
-        if (beh == BH_HOP) { e->vy = 0; }
+        if (beh == BH_HOP) e->vy = 0;
     } else switch (beh) {
     case BH_CRAWL: {
-        int speed = e->kind == 4 ? 180 : 110;
-        int fx = e->dir ? ex + 30 : ex + 1;
-        if (solid_at(fx, ey + 20)) e->dir ^= 1;
+        int speed = e->kind == 4 ? 220 : 130;
+        int fx = e->dir ? ex + EW - 6 : ex + 6;
+        if (solid_at(fx, ey + EH - 12)) e->dir ^= 1;
         else {
-            uint8_t below = cell(fx >> 4, (ey + 32) >> 4);
+            uint8_t below = cell(fx >> 4, (ey + EH) >> 4);
             if (below != T_ROCK && below != T_ONEWAY && below != T_CRACK && below != T_DOOR) e->dir ^= 1;
         }
         e->x += e->dir ? speed : -speed;
         break;
     }
     case BH_FLY: {
-        int acc = e->kind == 6 ? 18 : 12, lim = e->kind == 6 ? 300 : 210;
+        int acc = e->kind == 6 ? 18 : 12, lim = e->kind == 6 ? 320 : 230;
         if (e->state == 0) {
-            e->y = e->oy + ((int32_t)bob_tab[(G.frame >> 3) & 15] << FP);
-            if (dx < 110 && dx > -110 && dy < 90 && dy > -90) e->state = 1;
+            e->y = e->oy + ((int32_t)bob_tab[(G.frame >> 3) & 15] * (1 << FP));
+            if (dx < 130 && dx > -130 && dy < 110 && dy > -110) e->state = 1;
         } else {
             e->vx += dx > 0 ? acc : -acc;
             e->vy += dy > 0 ? acc : -acc;
@@ -79,58 +83,60 @@ static void update_one(Enemy *e) {
             if (e->vx < -lim) e->vx = -lim;
             if (e->vy > lim) e->vy = lim;
             if (e->vy < -lim) e->vy = -lim;
-            if (!box_solid(PX(e->x + e->vx) + 6, ey + 6, 20, 20)) e->x += e->vx; else e->vx = 0;
-            if (!box_solid(ex + 6, PX(e->y + e->vy) + 6, 20, 20)) e->y += e->vy; else e->vy = 0;
+            if (!box_solid(PX(e->x + e->vx) + 10, ey + 8, EW - 20, EH - 16)) e->x += e->vx; else e->vx = 0;
+            if (!box_solid(ex + 10, PX(e->y + e->vy) + 8, EW - 20, EH - 16)) e->y += e->vy; else e->vy = 0;
             e->oy = e->y;
-            if (dx > 220 || dx < -220) e->state = 0;
+            if (dx > 260 || dx < -260) e->state = 0;
         }
         e->dir = dx > 0;
         break;
     }
-    case BH_HOP: {
-        int grounded = box_solid(ex + 4, ey + 32, 24, 1) || cell((ex + 16) >> 4, (ey + 32) >> 4) == T_ONEWAY;
-        if (grounded && e->vy >= 0) {
+    case BH_HOP:
+        if (standing(ex, ey) && e->vy >= 0) {
             e->vy = 0;
-            e->y = (int32_t)(((ey + 32) >> 4) * TS - 32) << FP;
             e->vx = 0;
             if (e->timer) e->timer--;
             else {
                 e->timer = 60;
                 e->dir = dx > 0;
-                e->vy = e->kind == 7 ? -1500 : -1250;
-                e->vx = e->dir ? (e->kind == 7 ? 420 : 300) : (e->kind == 7 ? -420 : -300);
+                e->vy = e->kind == 7 ? -1700 : -1400;
+                e->vx = e->dir ? (e->kind == 7 ? 460 : 340) : (e->kind == 7 ? -460 : -340);
+                e->y += e->vy;
             }
         } else {
+            int steps, sd;
             e->vy += 90;
-            if (e->vy > 1400) e->vy = 1400;
-            if (box_solid(PX(e->x + e->vx) + 4, ey + 8, 24, 20)) e->vx = -e->vx;
+            if (e->vy > 1500) e->vy = 1500;
+            if (box_solid(PX(e->x + e->vx) + 8, ey + 10, EW - 16, EH - 14)) e->vx = -e->vx;
             e->x += e->vx;
-            if (e->vy < 0 && box_solid(ex + 4, PX(e->y + e->vy) + 4, 24, 4)) e->vy = 0;
-            e->y += e->vy;
-            ey = PX(e->y);
-            if (e->vy > 0 && box_solid(ex + 4, ey + 32, 24, 1)) {
-                e->y = (int32_t)(((ey + 32) >> 4) * TS - 32) << FP;
-                e->vy = 0;
+            ex = PX(e->x);
+            steps = PX(e->y + e->vy) - PX(e->y);
+            sd = steps < 0 ? -1 : 1;
+            while (steps) {
+                int ny = PX(e->y) + sd;
+                if (sd < 0 && box_solid(ex + 8, ny + 6, EW - 16, 4)) { e->vy = 0; break; }
+                e->y += sd * (1 << FP);
+                steps -= sd;
+                if (sd > 0 && standing(ex, PX(e->y))) { e->vy = 0; break; }
             }
-            if (ey > SH + 16) e->on = 0;
+            if (PX(e->y) > WH + 16) e->on = 0;
         }
         break;
-    }
     case BH_SPIT:
         e->dir = dx > 0;
         if (e->timer) e->timer--;
-        else if (dx < 200 && dx > -200) {
+        else if (dx < 220 && dx > -220 && dy > -220 && dy < 220) {
             e->timer = 120;
-            if (e->kind == 3) proj_spawn(P_DROP, ex + 12, ey + 28, 0, 200, 1);
-            else proj_spawn(P_ORB, ex + 12, ey + 4, dx > 0 ? 500 : -500, -900, 1);
+            if (e->kind == 3) proj_spawn(P_DROP, ex + EW / 2, ey + EH, 0, 200, 1);
+            else proj_spawn(P_ORB, ex + EW / 2, ey + 8, dx > 0 ? 560 : -560, -1000, 1);
             sfx(SFX_SELECT);
         }
         break;
     }
     ex = PX(e->x); ey = PX(e->y);
     if (e->on && !G.p.hurt && !G.p.dead &&
-        overlap(PX(G.p.x) + HX, PX(G.p.y) + HY, HW, HH, ex + 4, ey + 8, 24, 22))
-        player_hurt(1, pcx < ex + 16 ? -1 : 1);
+        overlap(PX(G.p.x) + HX, PX(G.p.y) + HY, HW, HH, ex + 8, ey + 10, EW - 16, EH - 12))
+        player_hurt(1, pcx < ex + EW / 2 ? -1 : 1);
 }
 
 void enemy_update(void) {
@@ -160,16 +166,16 @@ void proj_update(void) {
         q->y += q->vy;
         if (q->grav) q->vy += 60;
         x = PX(q->x); y = PX(q->y);
-        if (x < -16 || x > SW + 16 || y > SH + 16 || y < -40) { q->on = 0; continue; }
+        if (x < -16 || x > WW + 16 || y > WH + 16 || y < -80) { q->on = 0; continue; }
         if (q->kind == P_WAVE) {
-            if (solid_at(q->vx > 0 ? x + 16 : x, y + 16)) { q->on = 0; continue; }
-        } else if (y > 0 && solid_at(x + 8, y + 24)) {
-            part_spawn(0, x + 8, y + 20, 0, 0, 10);
+            if (solid_at(q->vx > 0 ? x + 12 : x - 12, y)) { q->on = 0; continue; }
+        } else if (y > 0 && solid_at(x, y + 8)) {
+            part_spawn(0, x, y, 0, 0, 10);
             q->on = 0;
             continue;
         }
         if (!G.p.hurt && !G.p.dead &&
-            overlap(PX(G.p.x) + HX, PX(G.p.y) + HY, HW, HH, x + 3, y + 6, 10, 22))
+            overlap(PX(G.p.x) + HX, PX(G.p.y) + HY, HW, HH, x - 7, y - 9, 14, 20))
             player_hurt(1, q->vx > 0 ? 1 : -1);
     }
 }

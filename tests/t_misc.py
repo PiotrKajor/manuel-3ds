@@ -21,19 +21,17 @@ g.tap(UP)
 print('lantern used, save written')
 
 # walk into the first room's enemy until dead, using real collisions
-gate = W.ROOM_KEYS['gallery']
+gate = W.ROOM_KEYS['span']        # nothing but spikes under the spawn point: it must end in death and a respawn
 b = bytearray(8)
-g.setup(gate, 1, 12, 2, bytes(b))
+g.setup(gate, 10, 27, 2, bytes(b))
 while g.mode() != M_PLAY:
     g.step(0)
 for _ in range(4000):
-    if g.dead() or g.mode() == M_DEATH:
+    if g.mode() == M_DEATH:
         break
-    g.step(RIGHT)
-    if g.px() > 300:
-        break
+    g.step(0)
 print('death state', g.mode(), g.hp())
-assert g.mode() == M_DEATH or g.hp() < 2, 'expected damage in the gallery'
+assert g.mode() == M_DEATH, 'expected death on the spikes'
 for _ in range(400):
     if g.mode() == M_PLAY and g.hp() > 0:
         break
@@ -64,10 +62,10 @@ print('audio peak', max(abs(v) for v in buf))
 g.L.host_set_headless(0)
 seen = set()
 for i in range(g.num_rooms()):
-    g.setup(i, 3, 12, 5, bytes(8))
+    g.setup(i, 10, 27, 5, bytes(8))
     g.step(0, 1)
     g.L.host_render()
-    seen.add(ctypes.string_at(g.L.host_fb_top(), 400 * 240 * 2))
+    seen.add(ctypes.string_at(g.L.host_fb_top(), 400 * 240 * 2) + ctypes.string_at(g.L.host_fb_bot(), 320 * 240 * 2))
 print('rooms rendered', len(seen), 'of', g.num_rooms())
 assert len(seen) == g.num_rooms()
 print('ALL OK')

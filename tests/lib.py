@@ -92,9 +92,9 @@ def macros(has):
     """Each macro is a list of (keys, frames). They end once the player lands or changes room."""
     out = []
     for d in (LEFT, RIGHT):
-        for n in (8, 16, 32):
+        for n in (8, 16, 32, 64):
             out.append([(d, n)])
-        for hold in (6, 12, 24):
+        for hold in (6, 12, 26):
             out.append([(A | d, hold), (d, 90)])
         for hold in (10, 24):
             out.append([(A, hold), (d, 90)])

@@ -2,21 +2,21 @@
 #include "core.h"
 
 #define WALK_ACC 64
-#define WALK_MAX 640
-#define JUMP_V 1792
-#define AIRJUMP_V 1600
+#define WALK_MAX 720
+#define JUMP_V 1980
+#define AIRJUMP_V 1760
 #define JUMP_CUT 512
 #define GRAV 90
-#define FALL_MAX 1536
-#define RUSH_V 1536
-#define RUSH_T 12
-#define HOOK_V 1536
-#define HOOK_RANGE 136
-#define CLEAVE_V 1792
+#define FALL_MAX 1700
+#define RUSH_V 1800
+#define RUSH_T 14
+#define HOOK_V 1700
+#define HOOK_RANGE 170
+#define CLEAVE_V 2000
 
 void player_hurt(uint8_t amount, int dirx) {
     Player *p = &G.p;
-    if (p->hurt || p->dead) return;
+    if (p->hurt || p->dead || p->dash) return;   /* the Rush dodges through anything */
     G.counters[2]++;
     if (g_god) { p->hurt = 40; return; }
     p->hp = p->hp > amount ? p->hp - amount : 0;
@@ -31,7 +31,6 @@ void player_hurt(uint8_t amount, int dirx) {
     p->vy = -900;
     G.hitstop = 5;
     G.shake = 8;
-    G.bot_dirty = 1;
     sfx(SFX_HURT);
     if (p->hp == 0) { p->dead = 1; sfx(SFX_DIE); }
 }
@@ -48,7 +47,7 @@ static void hazard_reset(void) {
 static int find_anchor(int dir) {
     const RoomDef *r = &rooms[G.room];
     int i, best = -1, pass;
-    int pcx = PX(G.p.x) + 16, pcy = PX(G.p.y) + 16;
+    int pcx = PX(G.p.x) + PW / 2, pcy = PX(G.p.y) + PH / 2;
     /* first look only in the held direction, then anywhere; never the ring just used */
     for (pass = dir ? 0 : 1; pass < 2 && best < 0; pass++) {
         int32_t best_d = (int32_t)HOOK_RANGE * HOOK_RANGE;
@@ -67,7 +66,7 @@ static int find_anchor(int dir) {
 
 static void break_crack(void) {
     const RoomDef *r = &rooms[G.room];
-    int i, x = PX(G.p.x) + HX, y = PX(G.p.y) + 32;
+    int i, x = PX(G.p.x) + HX, y = PX(G.p.y) + PH;
     for (i = 0; i < r->nent; i++) {
         const Ent *e = &r->ent[i];
         if (e->type == ENT_CRACK && !HAS(e->arg)) {
@@ -80,7 +79,6 @@ static void break_crack(void) {
                         G.map[ty][e->tx + k] = T_EMPTY;
                         part_spawn(1, (e->tx + k) * TS + 8, ty * TS + 8, (k & 1) ? 1 : -1, -1, 30);
                     }
-                G.bg_dirty = 1;
                 G.shake = 12;
                 sfx(SFX_SLAM);
                 return;
@@ -110,7 +108,7 @@ void player_update(void) {
     } else if (p->hook) {
         /* flying to an anchor */
         const Ent *e = &rooms[G.room].ent[p->hook_i];
-        int dx = e->tx * TS + 8 - (PX(p->x) + 16), dy = e->ty * TS + 8 - (PX(p->y) + 16);
+        int dx = e->tx * TS + 8 - (PX(p->x) + PW / 2), dy = e->ty * TS + 8 - (PX(p->y) + PH / 2);
         int adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy, m = adx > ady ? adx : ady;
         p->hook--;
         if (m < 14 || !p->hook) {
@@ -137,15 +135,14 @@ void player_update(void) {
         if (p->ground && HELD(K_X) && p->echo >= 33 && p->hp < p->maxhp && !dir) {
             p->heal++;
             p->vx = 0;
-            if ((p->heal & 7) == 1) part_spawn(1, PX(p->x) + 8 + (int)(rnd() & 15), PX(p->y) + 28, 0, -1, 24);
+            if ((p->heal & 7) == 1) part_spawn(1, PX(p->x) + 6 + (int)(rnd() & 15), PX(p->y) + PH - 4, 0, -1, 24);
             if (p->heal == 1) sfx(SFX_HEAL);
             if (p->heal >= 60) {
                 p->heal = 0;
                 p->echo -= 33;
                 p->hp++;
-                G.bot_dirty = 1;
-                sfx(SFX_PICKUP);
-                part_spawn(0, PX(p->x) + 16, PX(p->y) + 12, 0, 0, 12);
+                            sfx(SFX_PICKUP);
+                part_spawn(0, PX(p->x) + PW / 2, PX(p->y) + 14, 0, 0, 12);
             }
         } else p->heal = 0;
         if (!p->heal) {
@@ -172,8 +169,8 @@ void player_update(void) {
                 p->jbuf = 0;
                 p->vy = -AIRJUMP_V;
                 sfx(SFX_JUMP);
-                part_spawn(1, PX(p->x) + 10, PX(p->y) + 30, -1, 1, 16);
-                part_spawn(1, PX(p->x) + 22, PX(p->y) + 30, 1, 1, 16);
+                part_spawn(1, PX(p->x) + 8, PX(p->y) + PH - 2, -1, 1, 16);
+                part_spawn(1, PX(p->x) + 24, PX(p->y) + PH - 2, 1, 1, 16);
             }
             if (!HELD(K_A) && p->vy < -JUMP_CUT && !p->boost) p->vy = -JUMP_CUT;
             if (PRESSED(K_B) && HELD(K_DOWN) && !p->ground && HAS(F_CLEAVE)) {
@@ -192,6 +189,29 @@ void player_update(void) {
                 p->atk = 0;
                 if (!p->ground) p->air_dash = 1;
                 sfx(SFX_RUSH);
+            }
+            {
+                int tapped = -1;
+                if (HAS(F_HOOK) && G.touch && !G.touch_old) {
+                    /* tap an anchor ring on the lower screen */
+                    const RoomDef *rd = &rooms[G.room];
+                    int i, wx = G.tx + BOT_X, wy = G.ty + BOT_Y;
+                    for (i = 0; i < rd->nent; i++) {
+                        const Ent *e = &rd->ent[i];
+                        if (e->type == ENT_ANCHOR) {
+                            int ddx = wx - (e->tx * TS + 8), ddy = wy - (e->ty * TS + 8);
+                            int pdx = e->tx * TS + 8 - (PX(p->x) + PW / 2), pdy = e->ty * TS + 8 - (PX(p->y) + PH / 2);
+                            if (ddx * ddx + ddy * ddy < 24 * 24 && (int32_t)pdx * pdx + (int32_t)pdy * pdy < (int32_t)HOOK_RANGE * HOOK_RANGE) tapped = i;
+                        }
+                    }
+                }
+                if (tapped >= 0) {
+                    p->hook = 40;
+                    p->hook_i = (uint8_t)tapped;
+                    p->hook_last = (uint8_t)tapped;
+                    p->atk = 0;
+                    sfx(SFX_HOOK);
+                }
             }
             if (PRESSED(K_L) && HAS(F_HOOK)) {
                 int a = find_anchor(dir);
@@ -272,32 +292,32 @@ void player_update(void) {
     if (p->vy >= 0 && (box_solid(px + HX, py + HY + 1, HW, HH) || oneway_under(px, py))) p->ground = 1;
     if (p->ground) {
         p->coyote = 6;
-        p->hook_last = 255;
+        if (!p->hook) p->hook_last = 255;
         p->air_dash = 0;
         p->air_jump = 0;
         if (!box_hazard(px + HX - 8, py + HY, HW + 16, HH + 8)) { p->safe_x = p->x; p->safe_y = p->y; }
     }
 
     if (!p->dead && !p->dash && box_hazard(px + HX + 1, py + HY + 4, HW - 2, HH - 4)) hazard_reset();
-    if (!p->dead && rooms[G.room].exits[3] == NONE && py > SH) hazard_reset();
+    if (!p->dead && rooms[G.room].exits[3] == NONE && py > WH) hazard_reset();
 }
 
 void attack_check(void) {
     Player *p = &G.p;
-    int i, px = PX(p->x), py = PX(p->y), ax, ay, aw = 34, ah = 34;
+    int i, px = PX(p->x), py = PX(p->y), ax, ay, aw = 46, ah = 54;
     int dmg = HAS(F_WHET) ? 2 : 1, bx, by, bw, bh;
     if (p->cleave) {
-        ax = px + 2; ay = py + 20; aw = 28; ah = 24;
+        ax = px - 2; ay = py + 28; aw = 36; ah = 34;
         dmg += 1;
     } else {
         if (!(p->atk <= 11 && p->atk >= 4)) return;
-        ax = p->face ? px - 26 : px + 24;
-        ay = py - 2;
+        ax = p->face ? px - 34 : px + 20;
+        ay = py - 14;
     }
     for (i = 0; i < MAX_EN; i++) {
         Enemy *e = &G.en[i];
         if (!e->on || e->swing == p->swing) continue;
-        if (overlap(ax, ay, aw, ah, PX(e->x) + 2, PX(e->y) + 2, 28, 28)) {
+        if (overlap(ax, ay, aw, ah, PX(e->x) + 4, PX(e->y) + 4, EW - 8, EH - 6)) {
             e->swing = p->swing;
             enemy_hit(e, dmg);
             if (p->cleave) { p->cleave = 0; p->vy = -1500; }
@@ -315,7 +335,7 @@ void attack_check(void) {
 
 void find_interaction(void) {
     const RoomDef *r = &rooms[G.room];
-    int i, pcx = PX(G.p.x) + 16, pcy = PX(G.p.y) + 16;
+    int i, pcx = PX(G.p.x) + PW / 2, pcy = PX(G.p.y) + PH / 2;
     G.near_i = -1;
     for (i = 0; i < r->nent; i++) {
         const Ent *e = &r->ent[i];
@@ -323,7 +343,7 @@ void find_interaction(void) {
             int dx = pcx - (e->tx * TS + 8), dy = pcy - (e->ty * TS + 8);
             if (dx < 0) dx = -dx;
             if (dy < 0) dy = -dy;
-            if (dx < 28 && dy < 28) { G.near_i = (int8_t)i; return; }
+            if (dx < 34 && dy < 40) { G.near_i = (int8_t)i; return; }
         }
     }
 }
@@ -359,13 +379,12 @@ void interact(void) {
         p->hp = p->maxhp;
         save_game();
         sfx(SFX_SAVE);
-        part_spawn(0, PX(p->x) + 16, PX(p->y) + 12, 0, 0, 12);
-        part_spawn(1, PX(p->x) + 8, PX(p->y) + 28, -1, -1, 24);
-        part_spawn(1, PX(p->x) + 24, PX(p->y) + 28, 1, -1, 24);
-        G.msg = "SAVED";
+        part_spawn(0, PX(p->x) + PW / 2, PX(p->y) + 14, 0, 0, 12);
+        part_spawn(1, PX(p->x) + 8, PX(p->y) + PH - 4, -1, -1, 24);
+        part_spawn(1, PX(p->x) + 24, PX(p->y) + PH - 4, 1, -1, 24);
+        G.msg = "Saved";
         G.msg_t = 90;
-        G.bot_dirty = 1;
-    }
+        }
 }
 
 void check_items(void) {
@@ -375,11 +394,10 @@ void check_items(void) {
     for (i = 0; i < r->nent; i++) {
         const Ent *e = &r->ent[i];
         if (!G.item_on[i]) continue;
-        if (overlap(px, py, HW, HH, e->tx * TS - 4, e->ty * TS - 8, 24, 24)) {
+        if (overlap(px, py, HW, HH, e->tx * TS - 10, e->ty * TS - 20, 36, 36)) {
             G.item_on[i] = 0;
             sfx(SFX_PICKUP);
-            G.bot_dirty = 1;
-            if (e->type == ENT_ABILITY) {
+                    if (e->type == ENT_ABILITY) {
                 SET(e->arg);
                 save_game();
                 dialog(e->arg == F_RUSH ? TXT_GOT_RUSH : e->arg == F_HOOK ? TXT_GOT_HOOK : e->arg == F_CLEAVE ? TXT_GOT_CLEAVE : TXT_GOT_CLOAK, 0);

@@ -27,7 +27,7 @@ def fight(g, room_key, start_key, flags, maxhp, verbose=True):
     for n in flags:
         b[F[n] >> 3] |= 1 << (F[n] & 7)
     r = W.ROOM_KEYS[room_key]
-    g.setup(r, 3, 12, maxhp, bytes(b))
+    g.setup(r, 6, 27, maxhp, bytes(b))
     while g.mode() != M_PLAY:
         g.step(0)
     # walk in until the fight starts
@@ -61,11 +61,11 @@ def duel(g, on_frame=None):
             if g.dead():
                 v -= 5000
             if g.boss_active():
-                dx = abs(g.px() + 16 - (g.boss_x() + 32))
-                v -= abs(dx - 44) * 0.6
+                dx = abs(g.px() + 16 - (g.boss_x() + 48))
+                v -= abs(dx - 62) * 0.6
                 if not g.ground():
                     v -= 3
-                v -= 0 if 40 < g.px() < 330 else 25
+                v -= 0 if 60 < g.px() < 320 else 25
             if v > bestv:
                 best, bestv = pl, v
         g.restore(s)

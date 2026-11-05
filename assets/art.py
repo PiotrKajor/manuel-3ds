@@ -1,929 +1,636 @@
-"""Menuel - procedural art. Pixel values are indices 0..3, assets/build.py applies the palettes and scales by two."""
+"""Menuel - character art. Everything is drawn large with ink outlines, then reduced to smooth game-size frames."""
+import math
 from PIL import Image, ImageDraw
 
-
-def c555(rgb):
-    r, g, b = rgb
-    return (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10)
+SS = 4  # supersampling factor
+INK = (16, 11, 26, 255)
 
 
-class Cv:
-    def __init__(self, w, h, fill=0):
+class Pen:
+    """Drawing surface in final-pixel coordinates; the image is reduced by SS at the end."""
+
+    def __init__(self, w, h):
         self.w, self.h = w, h
-        self.im = Image.new('P', (w, h), fill)
+        self.im = Image.new('RGBA', (w * SS, h * SS), (0, 0, 0, 0))
         self.d = ImageDraw.Draw(self.im)
 
-    def get(self, x, y):
-        return self.im.getpixel((x, y)) if 0 <= x < self.w and 0 <= y < self.h else 0
+    def _pts(self, pts):
+        return [(x * SS, y * SS) for x, y in pts]
 
-    def set(self, x, y, v):
-        if 0 <= x < self.w and 0 <= y < self.h:
-            self.im.putpixel((x, y), v)
+    def poly(self, pts, fill, ink=1.2):
+        p = self._pts(pts)
+        self.d.polygon(p, fill=fill)
+        if ink:
+            self.d.line(p + p[:2], fill=INK, width=max(1, int(ink * SS)), joint='curve')
 
-    def rect(self, x0, y0, x1, y1, v):
-        for y in range(y0, y1 + 1):
-            for x in range(x0, x1 + 1):
-                self.set(x, y, v)
+    def flat(self, pts, fill):
+        self.d.polygon(self._pts(pts), fill=fill)
 
-    def line(self, *pts, v=1):
-        self.d.line(pts, fill=v)
+    def line(self, pts, col=INK, w=1.2):
+        self.d.line(self._pts(pts), fill=col, width=max(1, int(w * SS)), joint='curve')
 
-    def poly(self, pts, fill, outline=None):
-        self.d.polygon(pts, fill=fill, outline=outline)
+    def disc(self, x, y, rx, ry=None, fill=INK, ink=0):
+        ry = rx if ry is None else ry
+        box = ((x - rx) * SS, (y - ry) * SS, (x + rx) * SS, (y + ry) * SS)
+        self.d.ellipse(box, fill=fill, outline=INK if ink else None, width=max(1, int(ink * SS)) if ink else 0)
 
-    def blit(self, src, x, y, key=True):
-        for yy in range(src.h):
-            for xx in range(src.w):
-                v = src.get(xx, yy)
-                if v or not key:
-                    self.set(x + xx, y + yy, v)
+    def arc(self, x, y, r, a0, a1, col, w):
+        box = ((x - r) * SS, (y - r) * SS, (x + r) * SS, (y + r) * SS)
+        self.d.arc(box, a0, a1, fill=col, width=max(1, int(w * SS)))
 
-    def flipx(self):
-        c = Cv(self.w, self.h)
-        c.im = self.im.transpose(Image.FLIP_LEFT_RIGHT)
-        c.d = ImageDraw.Draw(c.im)
-        return c
-
-    def flipy(self):
-        c = Cv(self.w, self.h)
-        c.im = self.im.transpose(Image.FLIP_TOP_BOTTOM)
-        c.d = ImageDraw.Draw(c.im)
-        return c
+    def done(self):
+        return self.im.resize((self.w, self.h), Image.LANCZOS)
 
 
-def art(*lines):
-    c = Cv(max(len(l) for l in lines), len(lines))
-    for y, l in enumerate(lines):
-        for x, ch in enumerate(l):
-            if ch not in '. ':
-                c.set(x, y, int(ch))
-    return c
+def rot(pts, cx, cy, deg):
+    a = math.radians(deg)
+    c, s = math.cos(a), math.sin(a)
+    return [(cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c) for x, y in pts]
 
 
-def tile_bytes(c, x0=0, y0=0):
-    out = []
-    for y in range(8):
-        lo = hi = 0
-        for x in range(8):
-            v = c.get(x0 + x, y0 + y)
-            lo |= (v & 1) << (7 - x)
-            hi |= ((v >> 1) & 1) << (7 - x)
-        out += [lo, hi]
-    return out
+def C(r, g, b, a=255):
+    return (r, g, b, a)
 
 
-def spr_bytes(c):
-    """8x16 sprite order: column major, top tile then bottom tile."""
-    out = []
-    for cx in range(c.w // 8):
-        for cy in range(c.h // 16):
-            out += tile_bytes(c, cx * 8, cy * 16)
-            out += tile_bytes(c, cx * 8, cy * 16 + 8)
-    return out
+# ------------------------------------------------------------------ Menuel, after the user's drawing
+MASK = C(238, 230, 252)
+MASK_S = C(205, 190, 232)
+GEM = C(196, 176, 232)
+CLOAK = C(104, 82, 146)
+CLOAK_L = C(132, 108, 172)
+CLOAK_D = C(62, 50, 104)
+BLADE = C(150, 116, 156)
+BLADE_L = C(186, 152, 190)
+BLADE_D = C(112, 84, 122)
+HANDLE = C(52, 38, 62)
+POMMEL = C(120, 130, 160)
 
 
-# ------------------------------------------------------------------ font (5x7)
-GLYPHS = {}
+def draw_axe(p, hx, hy, deg, reach=1.0):
+    """Long pole with a big flag-like blade at the far end and a small steel butt, pivoting at the hand."""
+    def R(pts):
+        return rot(pts, hx, hy, deg)
+    L0, L1 = -15 * reach, 25 * reach
+    p.poly(R([(hx + L0, hy - 1.2), (hx + L1, hy - 1.2), (hx + L1, hy + 1.2), (hx + L0, hy + 1.2)]), HANDLE, 0.8)
+    p.poly(R([(hx + L0 - 4, hy), (hx + L0, hy - 2.4), (hx + L0 + 1, hy + 2.4)]), POMMEL, 0.9)
+    b = hx + L1 - 3
+    blade = [(b, hy - 1), (b + 3, hy - 17), (b + 20, hy - 20), (b + 23, hy - 1), (b + 20, hy + 2), (b + 2, hy + 4)]
+    p.poly(R(blade), BLADE, 1.4)
+    p.flat(R([(b + 4, hy - 16), (b + 20, hy - 18.5), (b + 21.5, hy - 12), (b + 5, hy - 10)]), BLADE_L)
+    p.flat(R([(b + 3, hy + 2.6), (b + 20, hy + 0.8), (b + 21.5, hy - 3), (b + 3, hy - 1)]), BLADE_D)
+    p.line(R([(b + 3, hy - 17), (b + 20, hy - 20)]), C(226, 206, 226), 0.7)
 
 
-def _g(ch, *rows):
-    GLYPHS[ch] = rows
-
-
-_g('A', ".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#")
-_g('B', "####.", "#...#", "#...#", "####.", "#...#", "#...#", "####.")
-_g('C', ".###.", "#...#", "#....", "#....", "#....", "#...#", ".###.")
-_g('D', "####.", "#...#", "#...#", "#...#", "#...#", "#...#", "####.")
-_g('E', "#####", "#....", "#....", "####.", "#....", "#....", "#####")
-_g('F', "#####", "#....", "#....", "####.", "#....", "#....", "#....")
-_g('G', ".###.", "#...#", "#....", "#.###", "#...#", "#...#", ".###.")
-_g('H', "#...#", "#...#", "#...#", "#####", "#...#", "#...#", "#...#")
-_g('I', ".###.", "..#..", "..#..", "..#..", "..#..", "..#..", ".###.")
-_g('J', "..###", "...#.", "...#.", "...#.", "...#.", "#..#.", ".##..")
-_g('K', "#...#", "#..#.", "#.#..", "##...", "#.#..", "#..#.", "#...#")
-_g('L', "#....", "#....", "#....", "#....", "#....", "#....", "#####")
-_g('M', "#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#")
-_g('N', "#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#", "#...#")
-_g('O', ".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###.")
-_g('P', "####.", "#...#", "#...#", "####.", "#....", "#....", "#....")
-_g('Q', ".###.", "#...#", "#...#", "#...#", "#.#.#", "#..#.", ".##.#")
-_g('R', "####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#")
-_g('S', ".####", "#....", "#....", ".###.", "....#", "....#", "####.")
-_g('T', "#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#..")
-_g('U', "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###.")
-_g('V', "#...#", "#...#", "#...#", "#...#", "#...#", ".#.#.", "..#..")
-_g('W', "#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#")
-_g('X', "#...#", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "#...#")
-_g('Y', "#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#..")
-_g('Z', "#####", "....#", "...#.", "..#..", ".#...", "#....", "#####")
-_g('0', ".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###.")
-_g('1', "..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###.")
-_g('2', ".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####")
-_g('3', "####.", "....#", "....#", ".###.", "....#", "....#", "####.")
-_g('4', "...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#.")
-_g('5', "#####", "#....", "####.", "....#", "....#", "#...#", ".###.")
-_g('6', ".###.", "#....", "#....", "####.", "#...#", "#...#", ".###.")
-_g('7', "#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#...")
-_g('8', ".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###.")
-_g('9', ".###.", "#...#", "#...#", ".####", "....#", "....#", ".###.")
-_g(' ', *["....."] * 7)
-_g('.', ".....", ".....", ".....", ".....", ".....", ".....", "..#..")
-_g(',', ".....", ".....", ".....", ".....", "..#..", "..#..", ".#...")
-_g('!', "..#..", "..#..", "..#..", "..#..", "..#..", ".....", "..#..")
-_g('?', ".###.", "#...#", "....#", "...#.", "..#..", ".....", "..#..")
-_g('-', ".....", ".....", ".....", ".###.", ".....", ".....", ".....")
-_g(':', ".....", "..#..", ".....", ".....", ".....", "..#..", ".....")
-_g("'", "..#..", "..#..", ".#...", ".....", ".....", ".....", ".....")
-_g('>', "#....", "##...", "###..", "####.", "###..", "##...", "#....")
-_g('/', "....#", "....#", "...#.", "..#..", ".#...", "#....", "#....")
-_g('+', ".....", "..#..", "..#..", "#####", "..#..", "..#..", ".....")
-
-
-def glyph(ch, color=3):
-    c = Cv(8, 8)
-    for y, row in enumerate(GLYPHS.get(ch, GLYPHS[' '])):
-        for x, p in enumerate(row):
-            if p == '#':
-                c.set(x + 1, y, color)
-    return c
-
-
-# ------------------------------------------------------------------ Menuel
-def menuel(leg=0, bob=0, tip=0, lean=0, squash=0):
-    """16x16, facing right. 1 black, 2 purple, 3 pale lilac."""
-    c = Cv(16, 16)
-    cx = 7 + lean
-    top = bob
-    # legs: two thin black spikes, as in the drawing
-    fy = 15
-    lx, rx = 6 + leg, 9 - leg
-    c.line(lx, 12 + bob, lx, fy, v=1)
-    c.line(rx, 12 + bob, rx, fy, v=1)
-    c.set(lx + 1, 12 + bob, 1)
-    c.set(rx - 1, 12 + bob, 1)
-    # jagged cloak
-    cy = 8 + bob + squash
-    pts = [(cx - 3, cy), (cx - 6, cy + 1 - tip), (cx - 4, cy + 2), (cx - 7, cy + 4 - tip), (cx - 3, cy + 4),
-           (cx - 2, cy + 6), (cx, cy + 4), (cx + 2, cy + 6), (cx + 3, cy + 4), (cx + 6, cy + 4 + tip),
-           (cx + 4, cy + 2), (cx + 6, cy + 1 + tip), (cx + 3, cy)]
-    c.poly(pts, 2, 1)
-    # darker fold across the chest
-    c.line(cx - 3, cy + 3, cx + 1, cy + 1, v=1)
-    # kite shaped mask, widest below the middle, sharp at both ends
-    head = [(cx, top), (cx + 4, top + 5 + squash), (cx + 1, top + 9), (cx, top + 9), (cx - 4, top + 5 + squash)]
-    c.poly(head, 3, 1)
-    # slit eyes
-    ey = top + 5 + squash
-    c.set(cx - 2, ey, 1); c.set(cx - 1, ey + 1, 1); c.set(cx - 2, ey + 1, 1)
-    c.set(cx + 2, ey, 1); c.set(cx + 1, ey + 1, 1); c.set(cx + 2, ey + 1, 1)
-    # small mark on the forehead
-    c.set(cx + 1, top + 3, 2)
-    return c
+def menuel(leg_a=0.0, leg_b=0.0, bob=0.0, sway=0.0, lean=0.0, axe=None, axe_front=False, squash=0.0, eye=1.0, tuck=0.0):
+    """128x128 canvas, feet at y=92, body centred on x=64, facing right. Proportions follow the drawing:
+    a huge kite mask, a short jagged cloak and two long black spikes for legs."""
+    p = Pen(128, 128)
+    cx, feet = 64.0, 92.0
+    hip = feet - 19 - tuck + bob + squash
+    if axe is not None and not axe_front:
+        draw_axe(p, cx + 6 + lean, hip - 8, axe)
+    # legs: long black spikes, clearly visible under the hem
+    for off, a in ((-6, leg_a), (6, leg_b)):
+        lift = abs(a) * 0.3
+        p.flat([(cx + off - 3.4, hip - 8), (cx + off + 3.4, hip - 8), (cx + off + a, feet - lift)], INK)
+    # cloak with jagged hem and collar
+    y = hip - 22
+    t = sway
+    pts = [(cx - 8 + lean, y), (cx - 19 + lean - t, y + 1), (cx - 13 + lean, y + 5), (cx - 22 + lean - t * 1.4, y + 10),
+           (cx - 14 + lean, y + 11), (cx - 19 + lean - t, y + 17), (cx - 9 + lean, y + 15), (cx - 7 + lean - t * .4, y + 21),
+           (cx - 2 + lean, y + 16), (cx + 2 + lean - t * .3, y + 21), (cx + 6 + lean, y + 15), (cx + 12 + lean - t * .6, y + 19),
+           (cx + 13 + lean, y + 13), (cx + 22 + lean + t * .4, y + 13), (cx + 15 + lean, y + 7), (cx + 21 + lean + t * .4, y + 2),
+           (cx + 8 + lean, y)]
+    p.poly(pts, CLOAK, 1.5)
+    # dark sweep across the cloak, as in the drawing
+    p.flat([(cx - 20 + lean - t, y + 10), (cx + 10 + lean, y + 1), (cx + 15 + lean, y + 6), (cx - 14 + lean, y + 15)], CLOAK_D)
+    p.flat([(cx - 12 + lean, y + 3), (cx - 3 + lean, y + 1), (cx - 9 + lean, y + 6)], CLOAK_L)
+    # stitch and small mark
+    p.line([(cx - 11 + lean, y + 5), (cx - 7 + lean, y + 9)], INK, .8)
+    p.line([(cx - 7 + lean, y + 5), (cx - 11 + lean, y + 9)], INK, .8)
+    p.line([(cx + 1 + lean, y + 11), (cx + 4 + lean, y + 13), (cx + 7 + lean, y + 10)], INK, .9)
+    # kite mask, big as in the drawing
+    top = hip - 55 + squash * .6
+    hx = cx + lean * 1.3
+    head = [(hx, top), (hx + 18, top + 25 - squash * .4), (hx + 2, top + 38), (hx - 2, top + 38), (hx - 18, top + 25 - squash * .4)]
+    p.poly(head, MASK, 1.7)
+    p.flat([(hx + 16, top + 26), (hx + 2, top + 36.5), (hx - 4, top + 36), (hx + 4, top + 27)], MASK_S)
+    # slit eyes tilting inward
+    ey = top + 22
+    for s in (-1, 1):
+        ex = hx + s * 8.5
+        h = 2.6 * eye + .3
+        p.flat([(ex + s * 5, ey - h), (ex - s * 4.2, ey + h * .5), (ex - s * 3, ey + h + 1.7), (ex + s * 4.2, ey + h * .2)], INK)
+    # forehead gem
+    p.flat([(hx + 5, top + 9), (hx + 8.5, top + 13), (hx + 5.5, top + 18), (hx + 2, top + 13)], GEM)
+    if axe is not None and axe_front:
+        draw_axe(p, cx + 6 + lean, hip - 8, axe)
+    return p.done()
 
 
 def player_frames():
-    return [
-        menuel(0, 0, 0),            # 0 idle
-        menuel(0, 1, 1),            # 1 idle
-        menuel(1, 0, 1),            # 2 run
-        menuel(0, 1, 0),            # 3 run
-        menuel(-1, 0, 1),           # 4 run
-        menuel(0, 1, 0),            # 5 run
-        menuel(1, 0, -1),           # 6 rise
-        menuel(-1, 0, 2),           # 7 fall
-        menuel(1, 0, 0, 1),         # 8 strike
-        menuel(1, 1, 2, 2),         # 9 rush
-        menuel(-1, 0, 2, -1),       # 10 hurt
-        menuel(0, 2, 2, 0, 1),      # 11 heal
-    ]
+    F = {}
+    for i in range(4):                      # idle: slow breathing, cloak drifting
+        s = math.sin(i * math.pi / 2)
+        F['IDLE%d' % i] = menuel(0, 0, s * .8, s * 1.0, axe=-52 + s * 2)
+    for i in range(8):                      # run: long stride, cloak trailing
+        a = math.sin(i * math.pi / 4)
+        b = abs(math.cos(i * math.pi / 4))
+        F['RUN%d' % i] = menuel(a * 7, -a * 7, -b * 1.5, 3 + b * 2, lean=2.5, axe=-40 + a * 7)
+    F['RISE'] = menuel(-3, 4, -1, -2, lean=1, axe=-68, tuck=3)
+    F['FALL'] = menuel(4, -4, 0, 5, lean=0, axe=-30, tuck=1)
+    # swing: windup, then a big arc over the head and through
+    for i, ang in enumerate((-125, -85, -30, 15, 40)):
+        F['ATK%d' % i] = menuel(5, -4, 0, 2 + i * .4, lean=2 + min(i, 2) * 1.2, axe=ang, axe_front=i >= 2)
+    F['DASH0'] = menuel(9, -9, 1, 9, lean=7, axe=-8, tuck=4)
+    F['DASH1'] = menuel(10, -10, 2, 11, lean=9, axe=-4, tuck=5)
+    F['HURT'] = menuel(-6, 5, 0, -5, lean=-4, axe=-110, eye=.2)
+    F['HEAL0'] = menuel(0, 0, 3, 2, axe=-90, squash=2, eye=.3)
+    F['HEAL1'] = menuel(0, 0, 3.8, -2, axe=-90, squash=2.6, eye=.3)
+    F['HOOK'] = menuel(-5, 5, -2, 6, lean=3, axe=-70, tuck=2)
+    F['CLEAVE0'] = menuel(-3, 3, -2, -5, lean=1, axe=70, axe_front=True, tuck=4)
+    F['CLEAVE1'] = menuel(-2, 2, -2, -7, lean=0, axe=92, axe_front=True, tuck=5)
+    return F
 
 
-def axe_idle():
-    """8x16: the axe held out beside Menuel."""
-    return art(
-        "........",
-        "..1111..",
-        ".122221.",
-        "12222221",
-        "12222221",
-        "12222221",
-        "12222221",
-        ".122221.",
-        "..1221..",
-        "...11...",
-        "...11...",
-        "...11...",
-        "...11...",
-        "...11...",
-        "........",
-        "........")
+# ------------------------------------------------------------------ enemies, 56x48, feet at the bottom
+def e_salt_mite(t):
+    p = Pen(56, 48)
+    k = math.sin(t * math.tau)
+    for i, x in enumerate((14, 24, 34, 42)):
+        o = k * 3 * (1 if i % 2 else -1)
+        p.line([(x, 34), (x + o - 3, 46)], INK, 2)
+    p.poly([(6, 38), (9, 22), (20, 12 + k), (37, 12 + k), (49, 24), (50, 38), (28, 42)], C(112, 136, 170), 1.5)
+    for x, h, w in ((16, 22, 5), (27, 27, 6), (38, 19, 5)):
+        p.poly([(x - w, 20), (x - 1, 20 - h + k), (x + w, 20)], C(226, 244, 252), 1.2)
+        p.flat([(x, 19), (x - 1, 20 - h + 3 + k), (x + w - 1, 19)], C(170, 206, 228))
+    p.disc(44, 28, 3.4, fill=C(250, 240, 180), ink=1)
+    p.disc(45, 28, 1.3, fill=INK)
+    return p.done()
 
 
-def axe_swing(kind):
-    """16x16 swing frames. 0 raised, 1 forward, 2 low, 3 straight down (Cleave)."""
-    c = Cv(16, 16)
-    if kind == 0:
-        c.line(1, 14, 8, 6, v=1)
-        c.poly([(5, 1), (13, 1), (15, 6), (9, 9)], 2, 1)
-    elif kind == 1:
-        c.line(0, 10, 7, 9, v=1)
-        c.line(0, 11, 7, 10, v=1)
-        c.poly([(7, 3), (15, 2), (15, 14), (7, 12)], 2, 1)
-        c.line(14, 4, 14, 12, v=3)
-    elif kind == 2:
-        c.line(0, 4, 7, 10, v=1)
-        c.poly([(6, 8), (14, 7), (13, 15), (4, 14)], 2, 1)
+def e_dust_moth(t):
+    p = Pen(56, 48)
+    a = math.sin(t * math.tau) * 12
+    wing = C(176, 150, 106)
+    for s in (-1, 1):
+        p.poly([(28, 22), (28 + s * 24, 6 - a), (28 + s * 26, 22 - a * .6), (28 + s * 14, 32)], wing, 1.4)
+        p.flat([(28 + s * 6, 21), (28 + s * 20, 11 - a), (28 + s * 21, 20 - a * .6), (28 + s * 11, 27)], C(218, 194, 146))
+        p.disc(28 + s * 16, 18 - a * .7, 3, fill=C(90, 62, 50))
+    p.poly([(23, 15), (33, 15), (32, 36), (28, 42), (24, 36)], C(92, 72, 58), 1.3)
+    p.disc(25, 18, 2, fill=C(250, 230, 150)); p.disc(31, 18, 2, fill=C(250, 230, 150))
+    p.line([(25, 15), (20, 7)], INK, 1); p.line([(31, 15), (36, 7)], INK, 1)
+    return p.done()
+
+
+def e_bog_frog(t):
+    p = Pen(56, 48)
+    if t < .5:
+        k = math.sin(t * 2 * math.tau) * 1.5
+        p.poly([(5, 47), (7, 30), (16, 18 + k), (40, 18 + k), (50, 30), (52, 47)], C(62, 124, 96), 1.5)
+        p.flat([(12, 44), (16, 34), (40, 34), (46, 44)], C(170, 206, 152))
+        p.line([(10, 31), (28, 36), (47, 30)], INK, 1.3)
+        for x in (18, 38):
+            p.disc(x, 17 + k, 6.5, fill=C(226, 238, 164), ink=1.2); p.disc(x + 1, 17 + k, 3, fill=INK)
     else:
-        c.line(7, 0, 7, 7, v=1)
-        c.line(8, 0, 8, 7, v=1)
-        c.poly([(2, 7), (13, 7), (11, 15), (4, 15)], 2, 1)
-        c.line(5, 14, 10, 14, v=3)
-    return c
+        p.poly([(2, 34), (12, 12), (34, 6), (52, 16), (42, 32), (18, 38)], C(62, 124, 96), 1.5)
+        p.line([(12, 34), (2, 46)], INK, 3); p.line([(40, 30), (52, 44)], INK, 3)
+        p.disc(40, 9, 6, fill=C(226, 238, 164), ink=1.2); p.disc(42, 9, 2.8, fill=INK)
+    return p.done()
 
 
-# ------------------------------------------------------------------ enemies (16x16, two frames each)
-def e_mite(f):
-    c = Cv(16, 16)
-    c.poly([(2, 15), (3, 9), (7, 5), (12, 6), (14, 11), (14, 15)], 2, 1)
-    c.poly([(5, 9), (7, 6), (9, 9)], 3, 1)
-    c.poly([(10, 10), (12, 7), (13, 11)], 3, 1)
-    c.set(4, 12, 1); c.set(6, 12, 1)
-    for x in (3, 7, 11):
-        c.set(x + f, 15, 1)
-    return c
+def e_bell_fish(t):
+    p = Pen(56, 48)
+    k = math.sin(t * math.tau) * 2.5
+    p.line([(28, 0), (28, 8)], C(90, 80, 66), 2)
+    p.poly([(23, 7), (33, 7), (41, 19), (46, 34), (10, 34), (15, 19)], C(182, 146, 66), 1.5)
+    p.flat([(18, 18), (24, 9), (27, 9), (22, 32), (13, 32)], C(232, 204, 116))
+    p.poly([(7, 33), (49, 33), (49, 37), (7, 37)], C(112, 88, 44), 1.2)
+    p.disc(22, 22, 3, fill=C(20, 40, 44)); p.disc(34, 22, 3, fill=C(20, 40, 44))
+    p.disc(28 + k, 41, 4.5, fill=C(92, 70, 40), ink=1.1)
+    return p.done()
 
 
-def e_moth(f):
-    c = Cv(16, 16)
-    a = -2 if f else 2
-    c.poly([(7, 8), (1, 4 + a), (2, 11 + a), (6, 11)], 2, 1)
-    c.poly([(8, 8), (14, 4 + a), (13, 11 + a), (9, 11)], 2, 1)
-    c.poly([(6, 6), (9, 6), (9, 13), (7, 15), (6, 13)], 3, 1)
-    c.set(6, 8, 1); c.set(9, 8, 1)
-    return c
+def e_cinder_beetle(t):
+    p = Pen(56, 48)
+    k = math.sin(t * math.tau)
+    for i, x in enumerate((13, 27, 41)):
+        p.line([(x, 34), (x + (k * 4 if i % 2 else -k * 4), 47)], INK, 2.2)
+    p.poly([(3, 36), (6, 21), (24, 8), (42, 12), (53, 26), (54, 36), (30, 40)], C(70, 44, 42), 1.6)
+    p.line([(26, 8), (30, 40)], INK, 1.6)
+    for x, y in ((14, 25), (20, 16), (38, 22), (44, 30), (35, 32), (13, 33)):
+        p.disc(x, y, 2.6, fill=C(255, 150 + int(k * 40), 40))
+    p.poly([(46, 20), (56, 15), (53, 27)], C(52, 32, 32), 1.1)
+    p.disc(46, 28, 2.5, fill=C(255, 226, 120))
+    return p.done()
 
 
-def e_frog(f):
-    c = Cv(16, 16)
-    if f:
-        c.poly([(1, 13), (6, 3), (12, 3), (15, 9), (9, 11)], 2, 1)
-        c.line(2, 15, 5, 11, v=1)
-        c.line(13, 10, 15, 14, v=1)
-        c.rect(9, 5, 10, 6, 3)
+def e_furnace_mouth(t):
+    p = Pen(56, 48)
+    k = (math.sin(t * math.tau) + 1) / 2
+    p.poly([(8, 47), (8, 13), (16, 4), (40, 4), (48, 13), (48, 47)], C(88, 78, 84), 1.6)
+    p.flat([(11, 44), (11, 15), (17, 8), (22, 8), (17, 44)], C(124, 114, 118))
+    p.poly([(14, 20 - k * 3), (42, 20 - k * 3), (42, 40), (14, 40)], C(255, int(130 + k * 80), 36), 1.4)
+    p.flat([(18, 28), (38, 28), (38, 40), (18, 40)], C(255, 236, 150))
+    for x in (18, 26, 34):
+        p.poly([(x - 3, 20 - k * 3), (x + 4, 20 - k * 3), (x + .5, 27 - k * 3)], C(226, 226, 220), .9)
+    for x in (16, 28, 40):
+        p.disc(x, 9, 1.8, fill=C(40, 34, 40))
+    return p.done()
+
+
+def e_hush_wraith(t):
+    p = Pen(56, 48)
+    k = math.sin(t * math.tau) * 3
+    p.poly([(28, 1), (43, 12), (46, 30), (41 + k, 47), (35, 37), (28 - k, 47), (22, 37), (15 + k, 47), (10, 30), (13, 12)], C(96, 82, 156), 1.5)
+    p.flat([(16, 14), (26, 5), (24, 40), (17, 42), (13, 30)], C(132, 118, 190))
+    p.poly([(28, 8), (39, 20), (28, 32), (17, 20)], C(234, 228, 250), 1.3)
+    p.line([(22, 19), (26, 22)], INK, 1.8); p.line([(34, 19), (30, 22)], INK, 1.8)
+    return p.done()
+
+
+def e_snow_hare(t):
+    p = Pen(56, 48)
+    if t < .5:
+        k = math.sin(t * 2 * math.tau)
+        p.poly([(8, 47), (10, 28), (24, 20), (42, 26), (48, 47)], C(232, 236, 250), 1.5)
+        p.poly([(26, 22), (22, 1 + k), (30, 1 + k), (34, 22)], C(232, 236, 250), 1.3)
+        p.poly([(36, 24), (37, 4 - k), (44, 6 - k), (42, 26)], C(232, 236, 250), 1.3)
+        p.flat([(27, 19), (25, 6), (28, 6), (31, 19)], C(214, 170, 196))
+        p.disc(39, 32, 2.4, fill=C(70, 30, 70))
     else:
-        c.poly([(1, 15), (2, 8), (6, 5), (11, 5), (14, 9), (15, 15)], 2, 1)
-        c.line(3, 11, 12, 13, v=1)
-        c.rect(9, 7, 10, 8, 3)
-        c.rect(4, 7, 5, 8, 3)
-    return c
+        p.poly([(2, 30), (16, 14), (38, 12), (54, 24), (40, 34), (14, 38)], C(232, 236, 250), 1.5)
+        p.poly([(24, 16), (10, 2), (18, 0), (34, 14)], C(232, 236, 250), 1.2)
+        p.line([(14, 36), (3, 46)], INK, 2.8); p.line([(40, 33), (52, 46)], INK, 2.8)
+        p.disc(44, 22, 2.2, fill=C(70, 30, 70))
+    return p.done()
 
 
-def e_bell(f):
-    """A small bell that spits drops from its mouth."""
-    c = Cv(16, 16)
-    c.poly([(7, 2), (9, 2), (12, 7), (13, 12), (3, 12), (4, 7)], 2, 1)
-    c.line(2, 13, 14, 13, v=1)
-    c.rect(6, 5, 7, 8, 3)
-    c.rect(7 + (1 if f else -1), 14, 8 + (1 if f else -1), 15, 3)
-    return c
+ENEMY_ART = [e_salt_mite, e_dust_moth, e_bog_frog, e_bell_fish, e_cinder_beetle, e_furnace_mouth, e_hush_wraith, e_snow_hare]
 
 
-def e_beetle(f):
-    c = Cv(16, 16)
-    c.poly([(1, 13), (3, 7), (8, 4), (13, 7), (15, 13)], 2, 1)
-    c.line(8, 4, 8, 13, v=1)
-    c.rect(11, 8, 12, 9, 3)
-    c.rect(3, 10, 5, 11, 3)
-    for x in (3, 8, 12):
-        c.line(x, 14, x + (1 if f else -1), 15, v=1)
-    return c
+# ------------------------------------------------------------------ NPCs, 64x64, feet at the bottom
+def npc_ringer(t):
+    p = Pen(64, 64)
+    k = math.sin(t * math.tau) * 1.2
+    p.line([(47, 8), (47, 64)], C(70, 50, 36), 2.4)
+    p.poly([(42, 7), (47, 2), (52, 7), (54, 14), (40, 14)], C(214, 178, 88), 1.2)
+    p.poly([(16, 64), (19, 32), (28, 22), (38, 22), (46, 34), (49, 64)], C(112, 96, 86), 1.5)
+    p.flat([(20, 62), (22, 34), (29, 26), (28, 62)], C(146, 128, 112))
+    p.poly([(22, 28 + k), (33, 10 + k), (44, 28 + k), (33, 34 + k)], C(232, 220, 196), 1.4)
+    p.flat([(27, 22 + k), (31, 22 + k), (31, 24 + k), (27, 24 + k)], INK)
+    p.flat([(36, 22 + k), (40, 22 + k), (40, 24 + k), (36, 24 + k)], INK)
+    return p.done()
 
 
-def e_furnace(f):
-    c = Cv(16, 16)
-    c.rect(2, 3, 13, 15, 2)
-    c.d.rectangle((2, 3, 13, 15), outline=1)
-    c.rect(4, 1, 11, 3, 1)
-    c.rect(4, 7 + f, 11, 12, 3)
-    c.rect(4, 7 + f, 11, 7 + f, 1)
-    c.set(5, 12, 1); c.set(8, 12, 1); c.set(10, 12, 1)
-    return c
+def npc_miner(t):
+    p = Pen(64, 64)
+    k = math.sin(t * math.tau)
+    p.poly([(14, 64), (15, 34), (24, 28), (42, 28), (51, 36), (50, 64)], C(96, 82, 70), 1.5)
+    p.flat([(25, 42), (40, 42), (40, 64), (25, 64)], C(148, 132, 104))
+    p.poly([(20, 12 + k), (46, 12 + k), (48, 32 + k), (18, 32 + k)], C(230, 214, 188), 1.4)
+    p.disc(27, 22 + k, 2.3, fill=INK); p.disc(39, 22 + k, 2.3, fill=INK)
+    p.poly([(15, 13 + k), (22, 3 + k), (44, 3 + k), (51, 13 + k)], C(214, 160, 60), 1.4)
+    p.disc(33, 7 + k, 4, fill=C(255, 244, 170), ink=1)
+    p.line([(52, 30), (60, 60)], C(66, 50, 40), 2.4)
+    p.poly([(46, 30), (60, 24), (61, 28), (51, 34)], C(150, 160, 176), 1)
+    return p.done()
 
 
-def e_wraith(f):
-    c = Cv(16, 16)
-    w = 1 if f else 0
-    c.poly([(8, 1), (13, 6), (13, 12), (11 + w, 15), (9, 12), (7 - w, 15), (5, 12), (3 + w, 15), (3, 6)], 2, 1)
-    c.poly([(8, 3), (11, 7), (8, 10), (5, 7)], 3, 1)
-    c.set(7, 7, 1); c.set(9, 7, 1)
-    return c
+def npc_clerk(t):
+    p = Pen(64, 64)
+    k = math.sin(t * math.tau) * 1.2
+    p.poly([(10, 64), (15, 36), (49, 36), (54, 64)], C(52, 92, 100), 1.5)
+    p.disc(32, 22 + k, 18, fill=C(186, 226, 200), ink=1.4)
+    p.disc(25, 21 + k, 5, fill=C(240, 246, 220), ink=1); p.disc(39, 21 + k, 5, fill=C(240, 246, 220), ink=1)
+    p.disc(25, 21 + k, 1.6, fill=INK); p.disc(39, 21 + k, 1.6, fill=INK)
+    p.line([(30, 21 + k), (34, 21 + k)], INK, 1)
+    p.poly([(38, 44), (56, 42), (58, 60), (40, 62)], C(226, 216, 180), 1.2)
+    p.line([(42, 49), (53, 48)], C(90, 90, 90), .8); p.line([(43, 54), (54, 53)], C(90, 90, 90), .8)
+    return p.done()
 
 
-def e_hare(f):
-    c = Cv(16, 16)
-    if f:
-        c.poly([(2, 12), (6, 7), (12, 6), (15, 9), (9, 12)], 3, 1)
-        c.poly([(9, 7), (5, 2), (8, 2), (11, 6)], 2, 1)
-        c.line(3, 13, 1, 15, v=1)
-        c.line(11, 12, 14, 15, v=1)
-    else:
-        c.poly([(2, 15), (3, 9), (8, 7), (13, 9), (14, 15)], 3, 1)
-        c.poly([(8, 8), (6, 1), (9, 1), (11, 8)], 2, 1)
-    c.rect(11, 10 if not f else 8, 11, 10 if not f else 8, 1)
-    return c
+def npc_smith(t):
+    p = Pen(64, 64)
+    k = math.sin(t * math.tau)
+    p.poly([(8, 64), (10, 32), (22, 24), (44, 24), (56, 32), (56, 64)], C(112, 68, 48), 1.6)
+    p.poly([(20, 34), (46, 34), (46, 64), (20, 64)], C(66, 54, 54), 1.2)
+    p.disc(32, 16 + k, 13, fill=C(214, 160, 120), ink=1.4)
+    p.flat([(22, 19 + k), (43, 19 + k), (39, 30 + k), (26, 30 + k)], C(230, 110, 40))
+    p.line([(25, 14 + k), (29, 16 + k)], INK, 1.5); p.line([(39, 14 + k), (35, 16 + k)], INK, 1.5)
+    p.line([(55, 34), (58, 10 + k)], C(60, 44, 36), 3)
+    p.poly([(50, 8 + k), (63, 7 + k), (63, 15 + k), (50, 16 + k)], C(150, 150, 164), 1.1)
+    return p.done()
 
 
-ENEMY_ART = [e_mite, e_moth, e_frog, e_bell, e_beetle, e_furnace, e_wraith, e_hare]
+def npc_hermit(t):
+    p = Pen(64, 64)
+    k = math.sin(t * math.tau) * 1.5
+    p.poly([(12, 64), (16, 28), (32, 8 + k), (48, 28), (52, 64), (42, 60), (32, 64), (22, 60)], C(204, 212, 236), 1.6)
+    p.flat([(18, 58), (20, 30), (32, 14 + k), (28, 60)], C(236, 240, 252))
+    p.poly([(23, 30 + k), (41, 30 + k), (37, 40 + k), (27, 40 + k)], C(30, 26, 54), 1.2)
+    p.disc(29, 34 + k, 1.3, fill=C(190, 220, 255)); p.disc(35, 34 + k, 1.3, fill=C(190, 220, 255))
+    return p.done()
 
 
-# ------------------------------------------------------------------ NPCs (16x16, two frames)
-def npc_ringer(f):
-    c = Cv(16, 16)
-    c.poly([(4, 15), (5, 7), (11, 7), (12, 15)], 2, 1)
-    c.poly([(5, 8), (8, 1 + f), (11, 8)], 3, 1)
-    c.set(7, 6, 1); c.set(9, 6, 1)
-    c.line(12, 3, 12, 15, v=1)
-    c.rect(11, 2, 13, 4, 3)
-    return c
+NPC_ART = [npc_ringer, npc_miner, npc_clerk, npc_smith, npc_hermit]
 
 
-def npc_miner(f):
-    c = Cv(16, 16)
-    c.poly([(3, 15), (4, 8), (12, 8), (13, 15)], 2, 1)
-    c.rect(5, 3 + f, 11, 8, 3)
-    c.d.rectangle((5, 3 + f, 11, 8), outline=1)
-    c.rect(4, 1 + f, 12, 3 + f, 2)
-    c.d.rectangle((4, 1 + f, 12, 3 + f), outline=1)
-    c.set(7, 6, 1); c.set(9, 6, 1)
-    c.set(8, 2 + f, 3)
-    return c
-
-
-def npc_clerk(f):
-    c = Cv(16, 16)
-    c.d.ellipse((3, 2 + f, 12, 11 + f), fill=3, outline=1)
-    c.poly([(4, 10), (12, 10), (14, 15), (2, 15)], 2, 1)
-    c.rect(5, 5 + f, 6, 7 + f, 1)
-    c.rect(9, 5 + f, 10, 7 + f, 1)
-    return c
-
-
-NPC_ART = [npc_ringer, npc_miner, npc_clerk]
-
-
-# ------------------------------------------------------------------ pickups, particles
-def item_rush():
-    return art("................", "................", ".....111........", "....12221.......", "...1222211...1..", "..122222211.11..", "..1222222211....", ".1222222222111..", ".12222222222211.", ".1222222222111..", "..1222222211....", "..122222211.11..", "...1222211...1..", "....12221.......", ".....111........", "................")
-
-
-def item_hook():
-    c = Cv(16, 16)
-    c.d.arc((2, 2, 14, 14), 180, 60, fill=3)
-    c.d.arc((3, 3, 13, 13), 180, 60, fill=2)
-    c.line(2, 8, 2, 15, v=1)
-    c.line(3, 8, 3, 15, v=1)
-    return c
-
-
-def item_cleave():
-    return axe_swing(3)
-
-
-def item_cloak():
-    c = Cv(16, 16)
-    c.poly([(5, 2), (10, 2), (14, 9), (12, 13), (10, 11), (8, 14), (6, 11), (4, 13), (2, 9)], 2, 1)
-    c.line(5, 5, 10, 5, v=3)
-    return c
-
-
-def item_shard(f):
-    c = Cv(16, 16)
-    c.poly([(8, 2), (12, 7), (9, 13), (6, 13), (4, 7)], 3, 1)
-    c.line(8, 4, 8, 10, v=2)
-    if f:
-        c.set(13, 3, 3); c.set(2, 11, 3)
-    return c
-
-
-def item_whet():
-    c = Cv(16, 16)
-    c.poly([(2, 10), (10, 4), (14, 7), (6, 13)], 2, 1)
-    c.line(4, 10, 10, 6, v=3)
-    return c
-
-
-def item_bell(f):
-    c = Cv(16, 16)
-    c.poly([(7, 1), (9, 1), (12, 6), (14, 12), (2, 12), (4, 6)], 3, 1)
-    c.line(1, 13, 15, 13, v=1)
-    c.rect(7 + f, 14, 8 + f, 15, 2)
-    c.rect(6, 4, 6, 8, 2)
-    return c
-
-
-def fx16(rows):
-    return art(*rows)
-
-
-def spark(n):
-    c = Cv(8, 16)
-    r = [1, 3, 4][n]
-    for dx, dy in ((r, 0), (-r, 0), (0, r), (0, -r)):
-        c.line(4, 8, 4 + dx, 8 + dy, v=3 if n < 2 else 2)
-    return c
-
-
-def mote(n):
-    c = Cv(8, 16)
-    c.rect(3, 7, 3 + n, 7 + n, 3)
-    return c
-
-
-def proj_drop(n):
-    c = Cv(8, 16)
-    c.poly([(4, 3), (6, 7), (5, 9), (3, 9), (2, 7)], 3, 1)
-    c.set(4 + n, 12, 2)
-    return c
-
-
-def proj_wave(n):
-    c = Cv(8, 16)
-    c.poly([(1, 15), (2 + n, 5 + n), (4, 2 + n), (6 - n, 6 + n), (7, 15)], 3, 2)
-    c.line(3, 15, 4, 8, v=1)
-    return c
-
-
-def proj_orb(n):
-    c = Cv(8, 16)
-    c.d.ellipse((1, 4, 6, 9 + n), fill=2, outline=1)
-    c.rect(3, 5, 4, 6, 3)
-    return c
-
-
-def hook_link():
-    c = Cv(8, 16)
-    c.rect(3, 6, 4, 9, 3)
-    c.d.rectangle((2, 5, 5, 10), outline=1)
-    return c
-
-
-def up_mark():
-    c = Cv(8, 16)
-    c.poly([(4, 2), (7, 6), (5, 6), (5, 10), (3, 10), (3, 6), (1, 6)], 3, 1)
-    return c
-
-
-# ------------------------------------------------------------------ bosses (32x32, five frames)
-def _legs(c, x0, x1, y0, f):
-    c.rect(x0, y0, x0 + 3, 31 - (2 if f == 2 else 0), 1)
-    c.rect(x1, y0, x1 + 3, 31 - (2 if f == 3 else 0), 1)
+# ------------------------------------------------------------------ bosses, 128x128, feet at the bottom
+# f: 0,1 idle  2 windup  3 attack  4 airborne  5 stunned
+def _f(f):
+    return dict(dy=(0, 2, 6, -2, -6, 10)[f], arm=(0, 8, -45, 40, -20, 60)[f], eye=(1, 1, 1.3, 1.4, 1, .25)[f])
 
 
 def boss_foreman(f):
-    """Salt Foreman: a squat miner in a crystal crust, swinging a pick."""
-    c = Cv(32, 32)
-    dy = {0: 0, 1: 1, 2: 3, 3: -1, 4: -2}[f]
-    _legs(c, 9, 19, 24, 0 if f < 2 else f)
-    c.poly([(4, 26), (3, 12 + dy), (9, 5 + dy), (22, 5 + dy), (28, 12 + dy), (27, 26)], 2, 1)
-    c.poly([(9, 7 + dy), (12, 0 + dy), (15, 7 + dy)], 3, 1)
-    c.poly([(16, 7 + dy), (20, 1 + dy), (23, 8 + dy)], 3, 1)
-    c.rect(11, 13 + dy, 21, 19 + dy, 3)
-    c.d.rectangle((11, 13 + dy, 21, 19 + dy), outline=1)
-    c.rect(13, 15 + dy, 14, 17 + dy, 1)
-    c.rect(18, 15 + dy, 19, 17 + dy, 1)
-    if f in (2, 4):
-        c.line(26, 15 + dy, 30, 1, v=1)
-        c.line(25, 3, 31, 1, v=3)
-    elif f == 3:
-        c.line(26, 18, 31, 18, v=1)
-        c.line(31, 12, 31, 24, v=3)
-    else:
-        c.line(27, 20, 31, 28, v=1)
-    return c
+    """Salt Foreman: a huge miner under a crust of salt crystals, still swinging his pick."""
+    p = Pen(128, 128)
+    v = _f(f)
+    dy = v['dy']
+    for x in (42, 72):
+        p.poly([(x, 96 + dy), (x + 16, 96 + dy), (x + 18, 127), (x - 3, 127)], C(46, 40, 54), 1.6)
+    # pick behind
+    ax, ay = 104, 66 + dy
+    a = v['arm']
+    p.line(rot([(ax, ay), (ax + 8, ay - 54)], ax, ay, a), C(64, 48, 40), 5)
+    p.poly(rot([(ax - 18, ay - 50), (ax + 8, ay - 62), (ax + 34, ay - 46), (ax + 8, ay - 52)], ax, ay, a), C(170, 184, 204), 1.6)
+    p.poly([(16, 104 + dy), (12, 56 + dy), (30, 28 + dy), (96, 28 + dy), (116, 58 + dy), (112, 104 + dy)], C(86, 104, 140), 2)
+    p.flat([(22, 98 + dy), (20, 58 + dy), (36, 36 + dy), (54, 36 + dy), (42, 98 + dy)], C(116, 136, 172))
+    for x, h, w in ((30, 28, 9), (50, 40, 11), (72, 34, 10), (93, 26, 9)):
+        p.poly([(x - w, 34 + dy), (x, 34 + dy - h), (x + w, 34 + dy)], C(226, 244, 252), 1.6)
+        p.flat([(x, 33 + dy), (x, 34 + dy - h + 5), (x + w - 2, 33 + dy)], C(164, 204, 228))
+    p.poly([(38, 54 + dy), (90, 54 + dy), (86, 84 + dy), (42, 84 + dy)], C(226, 212, 184), 1.8)
+    e = 3.2 * v['eye']
+    p.flat([(48, 66 + dy - e), (60, 66 + dy), (60, 66 + dy + e), (48, 66 + dy + e)], INK)
+    p.flat([(80, 66 + dy - e), (68, 66 + dy), (68, 66 + dy + e), (80, 66 + dy + e)], INK)
+    p.line([(54, 78 + dy), (74, 78 + dy)], INK, 2)
+    p.poly([(96, 56 + dy), (116, 62 + dy), (108, 78 + dy), (92, 74 + dy)], C(86, 104, 140), 1.7)
+    return p.done()
 
 
 def boss_rope(f):
-    """Rope Drowned: a bloated figure wound in old bell rope."""
-    c = Cv(32, 32)
-    dy = {0: 0, 1: 2, 2: 4, 3: 0, 4: -2}[f]
-    c.d.ellipse((5, 4 + dy, 26, 26 + dy), fill=2, outline=1)
-    for k in range(3):
-        c.line(6, 10 + k * 5 + dy, 25, 13 + k * 5 + dy, v=1)
-        c.line(6, 11 + k * 5 + dy, 25, 14 + k * 5 + dy, v=3)
-    c.d.ellipse((10, 6 + dy, 21, 15 + dy), fill=3, outline=1)
-    c.rect(12, 9 + dy, 14, 11 + dy, 1)
-    c.rect(17, 9 + dy, 19, 11 + dy, 1)
-    c.line(15, 0, 15, 5 + dy, v=3)
-    c.line(16, 0, 16, 5 + dy, v=1)
-    if f == 3:
-        c.line(6, 22, 0, 31, v=3)
-        c.line(25, 22, 31, 31, v=3)
-    else:
-        for x in (8, 15, 22):
-            c.line(x, 26 + dy, x + (f % 2) * 2 - 1, 31, v=3)
-    return c
+    """Rope Drowned: a bloated, pale figure bound in the bell rope that drowned it."""
+    p = Pen(128, 128)
+    v = _f(f)
+    dy = v['dy']
+    p.line([(64, 0), (64, 22 + dy)], C(170, 150, 96), 5)
+    p.disc(64, 66 + dy, 50, 46, fill=C(70, 132, 128), ink=2)
+    p.disc(50, 56 + dy, 28, 26, fill=C(106, 170, 156))
+    for i in range(5):
+        y = 34 + i * 16 + dy
+        p.line([(22, y), (106, y + 9)], C(60, 44, 30), 7)
+        p.line([(22, y - 1), (106, y + 8)], C(210, 186, 120), 4)
+    p.disc(64, 48 + dy, 25, 21, fill=C(216, 232, 208), ink=2)
+    e = 4.2 * v['eye']
+    p.disc(54, 46 + dy, 5, e + 1, fill=C(20, 40, 44)); p.disc(74, 46 + dy, 5, e + 1, fill=C(20, 40, 44))
+    p.disc(64, 60 + dy, 6, 3 + v['eye'] * 2, fill=C(20, 40, 44))
+    s = {3: 18, 4: -8}.get(f, 0)
+    for x, o in ((20, -6), (108, 6)):
+        p.line([(x, 76 + dy), (x + o - s * (1 if x < 64 else -1), 118)], C(70, 132, 128), 11)
+        p.line([(x, 76 + dy), (x + o - s * (1 if x < 64 else -1), 118)], C(106, 170, 156), 5)
+    for x in (42, 64, 86):
+        p.line([(x, 108 + dy), (x + (f % 2) * 4 - 2, 127)], C(210, 186, 120), 3.5)
+    return p.done()
 
 
 def boss_founder(f):
-    """Two-Headed Founder: two heads on one apron, ladle in hand."""
-    c = Cv(32, 32)
-    dy = {0: 0, 1: 1, 2: 2, 3: -1, 4: -2}[f]
-    _legs(c, 8, 20, 25, 0 if f < 2 else f)
-    c.poly([(5, 26), (6, 13 + dy), (26, 13 + dy), (27, 26)], 2, 1)
-    c.rect(11, 16 + dy, 21, 26, 3)
-    c.d.rectangle((11, 16 + dy, 21, 26), outline=1)
-    for hx in (9, 22):
-        tilt = (f % 2) if hx == 9 else -(f % 2)
-        c.d.ellipse((hx - 5, 3 + dy + tilt, hx + 4, 13 + dy + tilt), fill=3, outline=1)
-        c.rect(hx - 3, 7 + dy + tilt, hx - 2, 9 + dy + tilt, 1)
-        c.rect(hx + 1, 7 + dy + tilt, hx + 2, 9 + dy + tilt, 1)
-    if f == 2:
-        c.line(26, 17, 31, 6, v=1)
-        c.rect(28, 1, 31, 6, 3)
-    else:
-        c.line(27, 20, 31, 28, v=1)
-        c.rect(28, 27, 31, 30, 3)
-    return c
+    """Two-Headed Founder: two bickering heads on one leather apron, with a ladle of molten metal."""
+    p = Pen(128, 128)
+    v = _f(f)
+    dy = v['dy']
+    for x in (36, 74):
+        p.poly([(x, 100 + dy), (x + 18, 100 + dy), (x + 20, 127), (x - 3, 127)], C(40, 30, 30), 1.6)
+    p.poly([(20, 106 + dy), (22, 52 + dy), (106, 52 + dy), (110, 106 + dy)], C(170, 92, 54), 2)
+    p.poly([(40, 60 + dy), (88, 60 + dy), (94, 112 + dy), (34, 112 + dy)], C(82, 56, 44), 1.8)
+    p.flat([(44, 66 + dy), (56, 66 + dy), (50, 108 + dy), (40, 108 + dy)], C(112, 80, 60))
+    for hx, tilt, c in ((40, -6, C(232, 176, 128)), (88, 6, C(222, 158, 110))):
+        o = (f % 2) * 2
+        p.disc(hx, 34 + dy + o, 21, 22, fill=c, ink=2)
+        e = 2.8 * v['eye']
+        p.line([(hx - 12, 27 + dy + o + tilt / 3), (hx - 3, 30 + dy + o)], INK, 2)
+        p.line([(hx + 12, 27 + dy + o - tilt / 3), (hx + 3, 30 + dy + o)], INK, 2)
+        p.disc(hx - 7, 35 + dy + o, 2.8, e, fill=INK); p.disc(hx + 7, 35 + dy + o, 2.8, e, fill=INK)
+        p.disc(hx, 46 + dy + o, 7, 3 + (f == 3) * 3, fill=INK)
+    ax, ay = 110, 72 + dy
+    a = v['arm']
+    p.line(rot([(ax, ay), (ax + 10, ay + 38)], ax, ay, -a), C(56, 44, 44), 5)
+    cx, cy = rot([(ax + 12, ay + 44)], ax, ay, -a)[0]
+    p.disc(cx, cy, 11, fill=C(84, 78, 88), ink=1.6)
+    p.disc(cx, cy - 2, 7, 5, fill=C(255, 170, 40))
+    p.disc(cx - 2, cy - 3, 3, 2, fill=C(255, 240, 150))
+    return p.done()
 
 
 def boss_anvil(f):
-    """The Anvil: a walking anvil with a furnace glow in its waist."""
-    c = Cv(32, 32)
-    dy = {0: 0, 1: 1, 2: 4, 3: 0, 4: -3}[f]
-    c.poly([(1, 6 + dy), (24, 6 + dy), (31, 10 + dy), (24, 13 + dy), (22, 19 + dy), (26, 27), (5, 27), (9, 19 + dy), (6, 13 + dy)], 2, 1)
-    c.line(3, 7 + dy, 24, 7 + dy, v=3)
-    c.rect(11, 15 + dy, 19, 18 + dy, 3)
-    c.rect(13, 16 + dy, 14, 17 + dy, 1)
-    c.rect(17, 16 + dy, 18, 17 + dy, 1)
+    """The Anvil: a walking anvil of black iron with forge fire behind its visor."""
+    p = Pen(128, 128)
+    v = _f(f)
+    dy = v['dy']
     if f != 4:
-        c.rect(7, 28, 12, 31, 1)
-        c.rect(19, 28, 24, 31, 1)
-    return c
+        for x in (32, 78):
+            p.poly([(x, 100 + dy / 2), (x + 20, 100 + dy / 2), (x + 24, 127), (x - 4, 127)], C(38, 34, 42), 1.8)
+    p.poly([(2, 26 + dy), (88, 26 + dy), (125, 36 + dy), (92, 50 + dy), (84, 70 + dy), (98, 106 + dy), (28, 106 + dy), (44, 70 + dy), (30, 50 + dy)],
+           C(80, 76, 90), 2.2)
+    p.flat([(6, 28 + dy), (88, 28 + dy), (112, 35 + dy), (86, 38 + dy), (22, 38 + dy)], C(150, 146, 162))
+    p.flat([(36, 94 + dy), (50, 72 + dy), (60, 72 + dy), (44, 104 + dy)], C(106, 102, 116))
+    e = 7 * v['eye']
+    p.poly([(44, 54 + dy), (84, 54 + dy), (80, 54 + dy + e + 6), (48, 54 + dy + e + 6)], C(255, 150, 40), 1.6)
+    p.flat([(50, 57 + dy), (78, 57 + dy), (76, 54 + dy + e + 3), (52, 54 + dy + e + 3)], C(255, 236, 150))
+    return p.done()
 
 
 def boss_ringer(f):
-    """Silent Ringer: a tall hooded figure with a bell for a head and no clapper."""
-    c = Cv(32, 32)
-    dy = {0: 0, 1: 1, 2: 2, 3: 0, 4: -2}[f]
-    c.poly([(7, 31), (9, 14 + dy), (22, 14 + dy), (25, 31), (20, 28), (16, 31), (12, 28)], 2, 1)
-    c.poly([(14, 0 + dy), (18, 0 + dy), (23, 8 + dy), (25, 16 + dy), (7, 16 + dy), (9, 8 + dy)], 3, 1)
-    c.line(5, 17 + dy, 27, 17 + dy, v=1)
-    c.rect(12, 9 + dy, 19, 13 + dy, 1)
-    if f == 2:
-        c.line(9, 18, 0, 6, v=1)
-        c.line(22, 18, 31, 6, v=1)
-    elif f == 3:
-        c.line(9, 20, 0, 22, v=1)
-        c.line(22, 20, 31, 22, v=1)
-    else:
-        c.line(9, 20, 4, 30, v=1)
-        c.line(22, 20, 27, 30, v=1)
-    return c
+    """Silent Ringer: a tall robed figure whose head is a bell with no clapper."""
+    p = Pen(128, 128)
+    v = _f(f)
+    dy = v['dy'] * .6
+    p.poly([(26, 127), (36, 56 + dy), (92, 56 + dy), (104, 127), (86, 114), (64, 127), (42, 114)], C(70, 56, 124), 2.2)
+    p.flat([(32, 120), (40, 60 + dy), (58, 60 + dy), (48, 112)], C(102, 86, 158))
+    a = v['arm']
+    for s, x in ((-1, 36), (1, 92)):
+        h = 60 + dy
+        tip = rot([(x + s * 30, h + 44)], x, h, -s * a)[0]
+        p.line([(x, h + 6), tip], C(52, 42, 98), 13)
+        p.line([(x, h + 6), tip], C(92, 76, 148), 8)
+        p.disc(tip[0], tip[1], 6, fill=C(232, 226, 250), ink=1.5)
+    t = 2 + dy
+    p.poly([(56, t), (72, t), (90, 30 + dy), (98, 60 + dy), (30, 60 + dy), (38, 30 + dy)], C(226, 222, 244), 2.2)
+    p.flat([(42, 56 + dy), (50, 28 + dy), (60, 6 + dy), (58, 56 + dy)], C(250, 248, 255))
+    p.poly([(24, 58 + dy), (104, 58 + dy), (104, 66 + dy), (24, 66 + dy)], C(150, 140, 190), 1.8)
+    p.disc(64, 44 + dy, 15, 11, fill=C(16, 12, 32))
+    e = 2 * v['eye']
+    p.disc(58, 44 + dy, 2, e, fill=C(210, 200, 255)); p.disc(70, 44 + dy, 2, e, fill=C(210, 200, 255))
+    return p.done()
 
 
 BOSS_ART = [boss_foreman, boss_rope, boss_founder, boss_anvil, boss_ringer]
 
 
-# ------------------------------------------------------------------ palettes
-BLK = (8, 6, 16)
-THEMES = {
-    0: dict(name='salt', rock=[(14, 18, 34), (46, 58, 88), (96, 118, 150), (206, 228, 240)],
-            back=[(14, 18, 34), (20, 26, 46), (28, 36, 60), (44, 54, 82)],
-            deco=[(14, 18, 34), (40, 60, 90), (120, 170, 200), (230, 250, 255)],
-            hazard=[(14, 18, 34), (70, 80, 110), (170, 190, 210), (250, 255, 255)],
-            en1=[(0, 0, 0), BLK, (90, 120, 160), (220, 240, 250)], en2=[(0, 0, 0), BLK, (150, 130, 90), (240, 230, 180)]),
-    1: dict(name='belfry', rock=[(6, 22, 28), (20, 54, 58), (44, 104, 96), (140, 200, 150)],
-            back=[(6, 22, 28), (8, 32, 40), (12, 44, 54), (20, 64, 72)],
-            deco=[(6, 22, 28), (60, 80, 60), (170, 150, 80), (240, 220, 140)],
-            hazard=[(6, 22, 28), (20, 80, 110), (60, 150, 190), (190, 240, 250)],
-            en1=[(0, 0, 0), BLK, (50, 120, 90), (180, 240, 170)], en2=[(0, 0, 0), BLK, (170, 140, 60), (250, 230, 130)]),
-    2: dict(name='foundry', rock=[(26, 12, 10), (66, 32, 22), (122, 62, 34), (214, 134, 70)],
-            back=[(26, 12, 10), (36, 18, 14), (50, 26, 18), (72, 38, 24)],
-            deco=[(26, 12, 10), (80, 60, 56), (170, 120, 80), (250, 210, 120)],
-            hazard=[(26, 12, 10), (150, 40, 10), (240, 120, 20), (255, 230, 120)],
-            en1=[(0, 0, 0), BLK, (150, 70, 30), (250, 190, 90)], en2=[(0, 0, 0), BLK, (110, 90, 90), (255, 160, 60)]),
-    3: dict(name='summit', rock=[(20, 16, 40), (58, 50, 92), (112, 104, 150), (236, 236, 250)],
-            back=[(20, 16, 40), (28, 24, 56), (38, 34, 72), (54, 50, 96)],
-            deco=[(20, 16, 40), (80, 70, 130), (170, 150, 210), (250, 240, 255)],
-            hazard=[(20, 16, 40), (90, 110, 170), (170, 200, 240), (250, 255, 255)],
-            en1=[(0, 0, 0), BLK, (110, 90, 170), (235, 225, 255)], en2=[(0, 0, 0), BLK, (160, 170, 210), (250, 250, 255)]),
-}
-HUD_PAL = [(10, 8, 20), (70, 50, 100), (168, 120, 200), (244, 236, 250)]
-LANTERN_PAL = [(0, 0, 0), (70, 40, 20), (230, 150, 50), (255, 240, 160)]
-# OBJ palettes: 0 Menuel, 1 fx, 2 enemy A, 3 enemy B, 4 boss, 5 NPC, 6 items, 7 hit flash
-MENUEL_PAL = [(0, 0, 0), BLK, (120, 92, 160), (232, 222, 250)]
-FX_PAL = [(0, 0, 0), (60, 50, 90), (190, 170, 230), (255, 255, 255)]
-NPC_PAL = [(0, 0, 0), BLK, (110, 104, 120), (225, 215, 195)]
-ITEM_PAL = [(0, 0, 0), BLK, (190, 130, 60), (255, 235, 150)]
-FLASH_PAL = [(0, 0, 0), (255, 255, 255), (255, 255, 255), (255, 255, 255)]
-BOSS_PALS = [
-    [(0, 0, 0), BLK, (86, 110, 150), (226, 244, 255)],
-    [(0, 0, 0), BLK, (40, 110, 110), (200, 230, 170)],
-    [(0, 0, 0), BLK, (150, 60, 30), (250, 200, 110)],
-    [(0, 0, 0), BLK, (90, 86, 100), (255, 170, 60)],
-    [(0, 0, 0), BLK, (74, 60, 120), (240, 236, 255)],
-]
-MAP_PALS = [
-    [(12, 10, 24), (46, 58, 88), (120, 170, 200), (230, 250, 255)],
-    [(12, 10, 24), (20, 54, 58), (70, 170, 140), (190, 250, 200)],
-    [(12, 10, 24), (70, 32, 20), (220, 120, 60), (255, 210, 120)],
-    [(12, 10, 24), (58, 50, 92), (170, 150, 220), (250, 240, 255)],
-]
+# ------------------------------------------------------------------ items, 36x36
+GOLD, GOLD_L = C(236, 186, 76), C(255, 234, 150)
 
 
-def bg_palettes(theme):
-    t = THEMES[theme]
-    bg = t['rock'][0]
-    def fix(p):
-        return [bg] + p[1:]
-    return [t['rock'], t['back'], t['deco'], t['hazard'], fix(LANTERN_PAL), fix(FX_PAL), fix(ITEM_PAL), HUD_PAL]
+def item_rush():
+    p = Pen(36, 36)
+    for i, o in enumerate((0, 8, 16)):
+        p.poly([(6 + o, 8), (14 + o, 8), (24 + o, 18), (14 + o, 28), (6 + o, 28), (16 + o, 18)], (GOLD_L if i == 2 else GOLD), 1.2)
+    return p.done()
 
 
-def obj_palettes(theme):
-    t = THEMES[theme]
-    return [MENUEL_PAL, FX_PAL, t['en1'], t['en2'], BOSS_PALS[0], NPC_PAL, ITEM_PAL, FLASH_PAL]
+def item_hook():
+    p = Pen(36, 36)
+    p.arc(18, 17, 12, 190, 60, INK, 6.5)
+    p.arc(18, 17, 12, 190, 60, C(150, 170, 184), 3.5)
+    p.line([(6, 18), (6, 34)], INK, 3.6); p.line([(6, 18), (6, 34)], GOLD, 1.6)
+    return p.done()
 
 
-# ------------------------------------------------------------------ BG tiles
-U, D, L, R = 1, 2, 4, 8
-F_SOLID, F_ONEWAY, F_HAZARD = 1, 2, 4
+def item_cleave():
+    p = Pen(36, 36)
+    p.line([(18, 0), (18, 16)], HANDLE, 3)
+    p.poly([(5, 14), (31, 14), (27, 34), (9, 34)], BLADE, 1.5)
+    p.flat([(9, 16), (27, 16), (26, 22), (10, 22)], BLADE_L)
+    return p.done()
 
 
-def rock_tile(theme, mask):
-    c = Cv(8, 8, 1)
-    if theme == 0:      # salt: crossing facets
-        c.line(0, 7, 7, 0, v=2)
-        c.set(2, 2, 2); c.set(5, 6, 2)
-    elif theme == 1:    # wet bricks
-        c.line(0, 3, 7, 3, v=2); c.line(0, 7, 7, 7, v=2)
-        c.line(3, 0, 3, 3, v=2); c.line(6, 4, 6, 7, v=2)
-    elif theme == 2:    # riveted plate
-        c.d.rectangle((0, 0, 7, 7), outline=2)
-        c.set(2, 2, 3); c.set(5, 5, 3)
-    else:               # frozen stone
-        c.set(1, 2, 2); c.set(2, 2, 2); c.set(5, 5, 2); c.set(6, 5, 2); c.set(4, 1, 2)
-    if mask & L:
-        c.line(0, 0, 0, 7, v=2)
-    if mask & R:
-        c.line(7, 0, 7, 7, v=2)
-    if mask & D:
-        c.line(0, 7, 7, 7, v=0)
-    if mask & U:
-        c.line(0, 0, 7, 0, v=3)
-        if theme == 0:
-            c.set(1, 1, 3); c.set(4, 1, 3); c.set(6, 1, 3)
-        elif theme == 1:
-            c.line(0, 1, 7, 1, v=2); c.set(2, 2, 3); c.set(6, 3, 3)
-        elif theme == 2:
-            c.line(0, 1, 7, 1, v=2)
-        else:
-            c.line(0, 1, 7, 1, v=3); c.set(1, 2, 3); c.set(4, 2, 3); c.set(7, 3, 3)
-    return c
+def item_cloak():
+    p = Pen(36, 36)
+    p.poly([(11, 4), (25, 4), (33, 20), (28, 32), (23, 25), (18, 34), (13, 25), (8, 32), (3, 20)], C(190, 200, 240), 1.5)
+    p.flat([(8, 20), (13, 7), (18, 7), (15, 28)], C(236, 240, 255))
+    return p.done()
 
 
-def back_tile(theme, n):
-    c = Cv(8, 8)
-    if n == 1:
-        if theme == 0:
-            c.line(1, 5, 4, 2, v=1)
-        elif theme == 1:
-            c.line(0, 4, 7, 4, v=1); c.line(4, 0, 4, 4, v=1)
-        elif theme == 2:
-            c.rect(2, 2, 3, 3, 1)
-        else:
-            c.set(4, 3, 3)
-    elif n == 2:
-        if theme == 0:
-            c.set(5, 5, 2)
-        elif theme == 1:
-            c.set(3, 2, 2); c.set(3, 3, 1)
-        elif theme == 2:
-            c.line(0, 6, 7, 6, v=1)
-        else:
-            c.set(2, 6, 2)
-    return c
+def item_shard(t):
+    p = Pen(36, 36)
+    p.poly([(18, 2), (29, 15), (22, 33), (13, 33), (7, 15)], GOLD_L, 1.5)
+    p.flat([(18, 4), (27, 15), (18, 18)], C(255, 250, 214))
+    p.flat([(9, 15), (18, 18), (14, 32)], GOLD)
+    if t:
+        p.line([(31, 5), (31, 11)], C(255, 255, 230), 1); p.line([(28, 8), (34, 8)], C(255, 255, 230), 1)
+    return p.done()
 
 
-def deco_tiles(theme):
-    """Six decorative non-solid tiles: a b c d e f."""
-    out = []
-    if theme == 0:
-        a = art("........", "...3....", "..33....", "..32.3..", ".332.33.", ".322.32.", "3322332.", "32223223")
-        b = art("........", "........", "........", "......3.", ".3...33.", ".33..32.", "3323.322", "32233222")
-        c = art("..1221..", "..1221..", "..1221..", "..1221..", "..1221..", "..1221..", "..1221..", "..1221..")
-        d = art("11111111", "22222222", "1..11..1", "........", "........", "........", "........", "........")
-        e = art("........", "........", "...11...", "..1221..", ".112211.", ".122221.", ".122221.", "11111111")
-        f = art("...1....", "...1....", "...1....", "..111...", "..121...", "..131...", "..111...", "........")
-    elif theme == 1:
-        a = art("...33...", "..2222..", "..2222..", ".222222.", ".222222.", "33333333", "...22...", "........")
-        b = art("...12...", "...21...", "...12...", "...21...", "...12...", "...21...", "...12...", "...21...")
-        c = art("........", "1.......", "1.....1.", "11....1.", ".1..1.11", ".1..1..1", ".11.11.1", "..1..1.1")
-        d = art("11111111", "12222221", "12333221", "12222221", "11111111", "........", "........", "........")
-        e = art("..2222..", ".211112.", "21111112", "21122112", "21122112", "21111112", "21111112", "22222222")
-        f = art("........", "...3....", "...3....", "........", "...3....", "...3....", "........", "...3....")
-    elif theme == 2:
-        a = art("..1221..", ".122221.", "12211221", "21133112", "21133112", "12211221", ".122221.", "..1221..")
-        b = art("11211211", "11211211", "11211211", "11211211", "11211211", "11211211", "11211211", "11211211")
-        c = art("........", "...3....", "........", ".3......", "......3.", "..3.....", ".....3..", "........")
-        d = art("11111111", "22222222", "33333333", "22222222", "11111111", "........", "........", "........")
-        e = art("..2112..", "..1221..", "..2112..", "..1221..", "..2112..", "..1221..", "..2112..", "..1221..")
-        f = art("........", "........", "........", "...1....", "..111...", ".12321..", "1233321.", "12333321")
-    else:
-        a = art("33333333", ".3322333", ".323.232", ".32..22.", "..2..2..", "..2.....", "........", "........")
-        b = art("........", "........", "........", "...3....", "..333...", ".33333.3", "33233333", "32323333")
-        c = art("11111111", "12222221", "12222221", "12232221", "12222221", "12222221", ".122221.", "..1221..")
-        d = art("........", ".3......", "......3.", "..3.....", ".....3..", "3.......", "....3...", "........")
-        e = art("...11...", "...11...", "...11...", "...11...", "...11...", "...11...", "...11...", "...11...")
-        f = art("........", "...2....", "..222...", ".12221..", "..222...", "...2....", "........", "........")
-    for t in (a, b, c, d, e, f):
-        out.append(t)
-    return out
+def item_whet():
+    p = Pen(36, 36)
+    p.poly([(3, 23), (24, 7), (33, 14), (12, 31)], C(124, 136, 160), 1.5)
+    p.flat([(7, 22), (24, 9), (28, 12), (11, 26)], C(180, 192, 214))
+    return p.done()
 
 
-# Fixed BG tile layout. The common block never changes, the area block is swapped per theme.
-SOUL_STEPS = 9
+def item_bell(t):
+    """The last bell, large: 64x72."""
+    p = Pen(64, 72)
+    p.line([(32, 0), (32, 10)], C(70, 60, 54), 3)
+    a = (-3, 3)[t]
+    pts = rot([(26, 8), (38, 8), (48, 28), (56, 56), (8, 56), (16, 28)], 32, 8, a)
+    p.poly(pts, GOLD, 2)
+    p.flat(rot([(16, 52), (21, 26), (28, 11), (29, 52)], 32, 8, a), GOLD_L)
+    p.poly(rot([(4, 55), (60, 55), (60, 61), (4, 61)], 32, 8, a), C(158, 112, 44), 1.6)
+    return p.done()
 
 
-def _heart(full):
+def small_bell(on):
+    p = Pen(28, 30)
+    col = GOLD if on else C(44, 38, 62)
+    p.poly([(11, 3), (17, 3), (21, 12), (25, 23), (3, 23), (7, 12)], col, 1.3)
+    p.poly([(2, 23), (26, 23), (26, 26), (2, 26)], C(158, 112, 44) if on else C(30, 26, 44), 1)
+    if on:
+        p.flat([(8, 21), (10, 10), (13, 5), (13, 21)], GOLD_L)
+    return p.done()
+
+
+def heart(full):
+    p = Pen(20, 18)
+    pts = [(10, 17), (2, 9), (1, 5), (4, 2), (7, 2), (10, 5), (13, 2), (16, 2), (19, 5), (18, 9)]
     if full:
-        return art("........", ".11..11.", "1331223.", "13322221", ".122221.", "..1221..", "...11...", "........")
-    return art("........", ".11..11.", "1..11..1", "1......1", ".1....1.", "..1..1..", "...11...", "........")
-
-
-def _meter(part, n):
-    """Three tile bar pieces, n of 8 columns filled."""
-    c = Cv(8, 8)
-    for x in range(8):
-        c.set(x, 1, 2); c.set(x, 6, 2)
-    if part == 0:
-        c.rect(0, 1, 0, 6, 2)
-    if part == 2:
-        c.rect(7, 1, 7, 6, 2)
-    for x in range(n):
-        for y in range(2, 6):
-            c.set(x, y, 3)
-    return c
-
-
-def common_tiles():
-    names = {}
-    tiles = []
-
-    def add(name, cv):
-        names[name] = len(tiles)
-        tiles.append(cv)
-    add('hudbg', Cv(8, 8))
-    add('heart_full', _heart(True))
-    add('heart_empty', _heart(False))
-    add('whet', art("........", "........", ".....11.", "...1123.", ".1123311", "1233111.", ".111....", "........"))
-    for part in range(3):
-        for n in range(SOUL_STEPS):
-            add('soul%d_%d' % (part, n), _meter(part, n))
-    border = {
-        'b_tl': art("........", ".2222222", ".2111111", ".21.....", ".21.....", ".21.....", ".21.....", ".21....."),
-        'b_t': art("........", "22222222", "11111111", "........", "........", "........", "........", "........"),
-        'b_tr': art("........", "2222222.", "1111112.", ".....12.", ".....12.", ".....12.", ".....12.", ".....12."),
-        'b_l': art(".21.....", ".21.....", ".21.....", ".21.....", ".21.....", ".21.....", ".21.....", ".21....."),
-        'b_r': art(".....12.", ".....12.", ".....12.", ".....12.", ".....12.", ".....12.", ".....12.", ".....12."),
-        'b_bl': art(".21.....", ".21.....", ".21.....", ".21.....", ".21.....", ".2111111", ".2222222", "........"),
-        'b_b': art("........", "........", "........", "........", "........", "11111111", "22222222", "........"),
-        'b_br': art(".....12.", ".....12.", ".....12.", ".....12.", ".....12.", "1111112.", "2222222.", "........"),
-    }
-    for k, v in border.items():
-        add(k, v)
-    add('m_room', art("........", ".222222.", ".211112.", ".211112.", ".211112.", ".211112.", ".222222.", "........"))
-    add('m_seen', art("........", ".333333.", ".322223.", ".322223.", ".322223.", ".322223.", ".333333.", "........"))
-    add('m_lantern', art("........", ".333333.", ".322223.", ".323323.", ".323323.", ".322223.", ".333333.", "........"))
-    add('m_boss', art("........", ".333333.", ".313313.", ".331133.", ".331133.", ".313313.", ".333333.", "........"))
-    for i in range(32, 96):
-        add('font%d' % i, glyph(chr(i)))
-    return tiles, names
-
-
-AREA_NAMES = ['rock%d' % m for m in range(16)] + [
-    'empty', 'empty1', 'empty2', 'oneway', 'spike', 'lanternL', 'lanternR', 'tablet', 'crack', 'anchor', 'door',
-    'deco_a', 'deco_b', 'deco_c', 'deco_d', 'deco_e', 'deco_f']
-AREA_FLAG = {'oneway': F_ONEWAY, 'spike': F_HAZARD, 'crack': F_SOLID, 'door': F_SOLID}
-AREA_PAL = {'empty': 1, 'empty1': 1, 'empty2': 1, 'oneway': 0, 'spike': 3, 'lanternL': 4, 'lanternR': 4, 'tablet': 2,
-            'crack': 0, 'anchor': 6, 'door': 2}
-
-
-def area_tiles(theme):
-    out = {}
-    for m in range(16):
-        out['rock%d' % m] = rock_tile(theme, m)
-    for n, nm in enumerate(('empty', 'empty1', 'empty2')):
-        out[nm] = back_tile(theme, n)
-    out['oneway'] = art("33333333", "22222222", "1.1..1.1", "........", "........", "........", "........", "........")
-    if theme == 1:  # deep water instead of spikes
-        out['spike'] = art("........", "..2...2.", ".232.232", "23222322", "22222222", "12222122", "22122221", "11111111")
-    elif theme == 2:  # molten slag
-        out['spike'] = art("........", ".3...3..", "323.323.", "22222222", "23222322", "22212222", "12222122", "11111111")
+        p.poly(pts, C(190, 160, 240), 1.3)
+        p.flat([(4, 8), (3, 5), (5, 3.5), (8, 4), (8, 7)], C(240, 230, 255))
     else:
-        out['spike'] = art("...3...3", "...3...3", "..32..32", "..32..32", ".3322332", ".3223222", "33222222", "22222222")
-    out['lanternL'] = art("......11", ".....122", "....1233", "....1233", "....1232", "....1233", ".....122", ".....111")
-    out['lanternR'] = art("11......", "221.....", "3321....", "3321....", "2321....", "3321....", "221.....", "111.....")
-    out['tablet'] = art(".111111.", "12222221", "12333321", "12222221", "12333221", "12222221", "12222221", "11111111")
-    out['crack'] = art("31131133", "21121122", "12211212", "11222112", "12112211", "21121122", "21222112", "11111111")
-    out['anchor'] = art("..1111..", ".133331.", "13.11.31", "13.1..31", "13.1.131", ".133331.", "..1111..", "........")
-    out['door'] = art("12222221", "13333331", "12222221", "12222221", "12222221", "13333331", "12222221", "12222221")
-    for k, t in zip(('deco_a', 'deco_b', 'deco_c', 'deco_d', 'deco_e', 'deco_f'), deco_tiles(theme)):
-        out[k] = t
-    return [out[n] for n in AREA_NAMES]
+        p.poly(pts, C(30, 24, 48, 200), 1.1)
+    return p.done()
 
 
-# ------------------------------------------------------------------ sprite sheet
-class Sheet:
-    def __init__(self):
-        self.tiles = []     # 16-byte tiles
-        self.names = {}
-
-    def add(self, name, cv):
-        self.names[name] = len(self.tiles)
-        b = spr_bytes(cv)
-        for i in range(0, len(b), 16):
-            self.tiles.append(b[i:i + 16])
-        assert len(self.tiles) % 2 == 0
+# ------------------------------------------------------------------ projectiles and effects
+def proj_drop(t):
+    p = Pen(20, 28)
+    p.poly([(10, 1), (16, 14), (15, 22), (10, 26), (5, 22), (4, 14)], C(120, 196, 224), 1.2)
+    p.flat([(7, 15), (10, 7), (10, 21)], C(216, 244, 252))
+    return p.done()
 
 
-def build_sprites():
-    s = Sheet()
-    for i, f in enumerate(player_frames()):
-        s.add('MENUEL%d' % i if i else 'MENUEL', f)
-    s.add('AXE_IDLE', axe_idle())
-    for i in range(4):
-        s.add('AXE%d' % i, axe_swing(i))
-    for ei, fn in enumerate(ENEMY_ART):
-        for f in range(2):
-            s.add('EN%d_%d' % (ei, f), fn(f))
-    for ni, fn in enumerate(NPC_ART):
-        for f in range(2):
-            s.add('NPC%d_%d' % (ni, f), fn(f))
-    s.add('IT_RUSH', item_rush()); s.add('IT_HOOK', item_hook()); s.add('IT_CLEAVE', item_cleave()); s.add('IT_CLOAK', item_cloak())
-    s.add('IT_SHARD', item_shard(0)); s.add('IT_SHARD1', item_shard(1)); s.add('IT_WHET', item_whet())
-    s.add('IT_BELL', item_bell(0)); s.add('IT_BELL1', item_bell(1))
-    for i in range(3):
-        s.add('SPARK%d' % i, spark(i))
-    s.add('MOTE0', mote(0)); s.add('MOTE1', mote(1))
-    s.add('DROP0', proj_drop(0)); s.add('DROP1', proj_drop(1))
-    s.add('WAVE0', proj_wave(0)); s.add('WAVE1', proj_wave(1))
-    s.add('ORB0', proj_orb(0)); s.add('ORB1', proj_orb(1))
-    s.add('LINK', hook_link()); s.add('UPMARK', up_mark())
-    return s
+def proj_wave(t):
+    p = Pen(28, 34)
+    k = t * 3
+    p.poly([(1, 33), (5 + k, 15), (10, 4 + k), (15, 13), (22 - k, 8 + k), (27, 33)], C(236, 244, 255), 1.3)
+    p.flat([(7, 32), (10, 14), (14, 32)], C(150, 196, 236))
+    return p.done()
 
 
-SPR_BOSS_FIRST = 176
+def proj_orb(t):
+    p = Pen(24, 24)
+    p.disc(12, 12, 10 + t, fill=C(255, 120, 40, 90))
+    p.disc(12, 12, 7, fill=C(255, 150, 40), ink=1)
+    p.disc(10, 10, 3.2, fill=C(255, 244, 170))
+    return p.done()
 
 
-def boss_bytes(i):
-    out = []
-    for f in range(5):
-        out += spr_bytes(BOSS_ART[i](f))
-    return out
+def spark(n):
+    p = Pen(40, 40)
+    r = (6, 13, 18)[n]
+    w = (3, 2.4, 1.2)[n]
+    for a in range(0, 360, 45):
+        ca, sa = math.cos(math.radians(a)), math.sin(math.radians(a))
+        r0 = r * .45 * (n > 0)
+        p.line([(20 + ca * r0, 20 + sa * r0), (20 + ca * r, 20 + sa * r)], C(255, 250, 225), w)
+    return p.done()
 
 
-# ------------------------------------------------------------------ title
-def title_canvas():
-    """160x144 title: Menuel with axe. Palette 0: art, palette 1: letters."""
-    c = Cv(160, 144)
-    # Distant bells
-    for bx, by in ((18, 18), (136, 26)):
-        c.poly([(bx, by), (bx + 4, by), (bx + 10, by + 14), (bx - 6, by + 14)], 1)
-    # Axe behind Menuel
-    c.poly([(112, 40), (146, 28), (154, 62), (120, 74)], 2, 1)
-    c.line(113, 44, 146, 32, v=3)
-    c.line(116, 62, 84, 74, v=1)
-    c.line(116, 63, 84, 75, v=1)
-    c.line(116, 64, 84, 76, v=1)
-    # Cloak
-    c.poly([(58, 62), (32, 60), (42, 72), (22, 72), (36, 84), (28, 96), (50, 92), (58, 106), (68, 94), (76, 106), (86, 92),
-            (106, 96), (96, 84), (114, 72), (92, 72), (102, 60), (78, 62)], 2, 1)
-    c.line(44, 84, 84, 66, v=1)
-    c.line(44, 85, 84, 67, v=1)
-    # Legs
-    for x in (56, 76):
-        c.poly([(x - 3, 100), (x + 5, 100), (x + 1, 122)], 1)
-    # Mask
-    c.poly([(68, 6), (94, 44), (70, 72), (66, 72), (42, 44)], 3, 1)
-    c.line(68, 6, 94, 44, v=1)
-    c.poly([(50, 42), (62, 50), (60, 56), (52, 50)], 1)
-    c.poly([(86, 42), (74, 50), (76, 56), (84, 50)], 1)
-    c.poly([(76, 24), (80, 28), (76, 32), (72, 28)], 2)
-    return c
+def mote(n):
+    p = Pen(10, 10)
+    p.disc(5, 5, 2 + n, fill=C(235, 225, 255, 230))
+    return p.done()
 
 
-def build_title():
-    """Returns tiles, map, attrs and four palettes."""
-    c = title_canvas()
-    tiles, m, attrs = [], [], []
-    seen = {}
-    for ty in range(18):
-        for tx in range(20):
-            b = tuple(tile_bytes(c, tx * 8, ty * 8))
-            if b not in seen:
-                seen[b] = len(tiles)
-                tiles.append(list(b))
-            m.append(seen[b])
-            attrs.append(0)
-    assert len(tiles) <= 165, len(tiles)
-    return tiles, m, attrs
+def hook_link():
+    p = Pen(12, 12)
+    p.disc(6, 6, 3.6, fill=C(186, 198, 214), ink=1.1)
+    return p.done()
+
+
+def anchor_ring(lit):
+    p = Pen(28, 28)
+    if lit:
+        p.disc(14, 14, 13, fill=C(255, 226, 130, 80))
+    p.arc(14, 14, 9, 0, 360, INK, 5)
+    p.arc(14, 14, 9, 0, 360, GOLD_L if lit else C(176, 150, 96), 2.6)
+    return p.done()
+
+
+def up_mark():
+    p = Pen(16, 18)
+    p.poly([(8, 1), (15, 9), (11, 9), (11, 17), (5, 17), (5, 9), (1, 9)], C(255, 240, 180), 1.2)
+    return p.done()
+
+
+if __name__ == '__main__':
+    import sys
+    bg = (46, 44, 70, 255)
+    F = player_frames()
+    cols = 8
+    sheet = Image.new('RGBA', (cols * 128, ((len(F) + cols - 1) // cols) * 128), bg)
+    for i, im in enumerate(F.values()):
+        sheet.alpha_composite(im, ((i % cols) * 128, (i // cols) * 128))
+    sheet.save(sys.argv[1] + '/menuel.png')
+    items = []
+    for fn in ENEMY_ART + NPC_ART:
+        for t in (0.0, 0.6):
+            items.append(fn(t))
+    s2 = Image.new('RGBA', (8 * 68, 3 * 68), bg)
+    for i, im in enumerate(items):
+        s2.alpha_composite(im, ((i % 8) * 68 + 2, (i // 8) * 68 + 2))
+    s2.resize((s2.width * 2, s2.height * 2), Image.NEAREST).save(sys.argv[1] + '/mobs.png')
+    s3 = Image.new('RGBA', (6 * 130, 5 * 130), bg)
+    for b, fn in enumerate(BOSS_ART):
+        for f in range(6):
+            s3.alpha_composite(fn(f), (f * 130 + 1, b * 130 + 1))
+    s3.save(sys.argv[1] + '/bosses.png')

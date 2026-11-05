@@ -118,7 +118,7 @@ void host_setup_bench(int room) {
     fl[0] = 0x0F;   /* all abilities, no boss beaten: every boss room is live */
     memcpy(G.flags, fl, 8);
     G.p.maxhp = 9;
-    G.save_room = (uint8_t)room; G.save_tx = 3; G.save_ty = 12; G.have_save = 0;
+    G.save_room = (uint8_t)room; G.save_tx = 10; G.save_ty = 27; G.have_save = 0;
     respawn();
 }
 static void bench(void) {
@@ -173,15 +173,14 @@ static void bench(void) {
 static void overlay(double step_ms, double total_ms, double worst_ms, int late) {
     char b[40];
     int i;
-    for (i = 226; i < BH; i++) memset(fb_bot[i], 0, sizeof(fb_bot[0]));
-    snprintf(b, sizeof(b), "%.1f/%.1f MAX %.1f LATE %d", step_ms, total_ms, worst_ms, late);
-    draw_text(&fb_bot[0][0], BW, BH, 4, 229, b, 0xFFE0, 1);
+    for (i = 224; i < BH; i++) memset(fb_bot[i], 0, sizeof(fb_bot[0]));
+    snprintf(b, sizeof(b), "%.1f/%.1f max %.1f late %d", step_ms, total_ms, worst_ms, late);
+    render_text_bot(4, 224, b);
 }
 
 int main(void) {
     static int show_perf, late;
     static double worst;
-    int bot_frames = 2;
     osSetSpeedupEnable(true);
     gfxInit(GSP_RGB565_OES, GSP_RGB565_OES, false);
     gfxSetDoubleBuffering(GFX_TOP, true);
@@ -199,25 +198,25 @@ int main(void) {
             show_perf = !show_perf;
             worst = 0;
             late = 0;
-            G.bot_dirty = 1;
+        }
+        {
+            touchPosition tp;
+            hidTouchRead(&tp);
+            core_touch((hidKeysHeld() & KEY_TOUCH) != 0, tp.px, tp.py);
         }
         t0 = svcGetSystemTick();
         core_step(read_keys());
-        if (G.bot_dirty_seen) { G.bot_dirty_seen = 0; bot_frames = 2; }
         t1 = svcGetSystemTick();
         audio_pump();
         present(GFX_TOP, &fb_top[0][0], SW);
-        if (show_perf) bot_frames = 2;
-        if (bot_frames > 0) {   /* two buffers: a change must reach both */
-            present(GFX_BOTTOM, &fb_bot[0][0], BW);
-            bot_frames--;
-        }
+        present(GFX_BOTTOM, &fb_bot[0][0], BW);
         t2 = svcGetSystemTick();
         if (show_perf) {
             double s = (t1 - t0) / TICKS_PER_MS, a = (t2 - t0) / TICKS_PER_MS;
             if (a > worst) worst = a;
             if (a > 16.6) late++;
             overlay(s, a, worst, late);
+            present(GFX_BOTTOM, &fb_bot[0][0], BW);
         }
         gfxFlushBuffers();
         gfxSwapBuffers();

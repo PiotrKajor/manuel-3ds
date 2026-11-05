@@ -9,7 +9,7 @@ AUTHOR = Menuel project
 
 all: build/libmenuel.so
 
-build/assets.bin src/gen.h src/gen_world.c: assets/art.py assets/world.py assets/music.py assets/build.py docs/menuel-reference.png
+build/assets.bin src/gen.h src/gen_world.c: assets/art.py assets/bake.py assets/world.py assets/music.py assets/build.py docs/menuel-reference.png
 	$(PY) assets/build.py
 
 build/libmenuel.so: $(CORE) src/host.c $(HDRS) build/assets.bin
