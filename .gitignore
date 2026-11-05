@@ -1,0 +1,6 @@
+build/
+.venv/
+tools/cia/
+preview/
+__pycache__/
+*.ram
