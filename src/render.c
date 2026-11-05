@@ -194,10 +194,12 @@ static void dim_top(int level) {
     /* level 0..8: halve brightness steps by masking */
     if (level <= 0) return;
     if (level >= 8) { memset(f, 0, sizeof(fb_top)); return; }
-    for (i = 0; i < SW * SH; i++) {
-        uint32_t c = f[i];
-        uint32_t r = (c >> 11) * (8 - level) / 8, g = ((c >> 5) & 63) * (8 - level) / 8, b = (c & 31) * (8 - level) / 8;
-        f[i] = (uint16_t)((r << 11) | (g << 5) | b);
+    {
+        uint32_t k = (uint32_t)(8 - level);
+        for (i = 0; i < SW * SH; i++) {
+            uint32_t c = f[i];
+            f[i] = (uint16_t)((((c & 0xF81Fu) * k >> 3) & 0xF81Fu) | (((c & 0x07E0u) * k >> 3) & 0x07E0u));
+        }
     }
 }
 
@@ -247,6 +249,7 @@ static void dialog_box(void) {
 /* ------------------------------------------------------------ bottom screen */
 static void render_bottom(void) {
     uint16_t *f = &fb_bot[0][0];
+    G.bot_dirty_seen = 1;
     int i, x, y;
     fill(f, BW, 0, 0, BW, BH, rgb(14, 10, 26));
     if (G.mode == M_TITLE) {
@@ -352,7 +355,7 @@ void render(void) {
         draw_text(&fb_top[0][0], SW, SH, 238, 130, "MENUEL AND THE LAST BELL", rgb(190, 170, 230), 1);
         draw_text(&fb_top[0][0], SW, SH, 238, 146, "THANK YOU FOR PLAYING", rgb(190, 170, 230), 1);
         if (G.timer > 60) draw_text(&fb_top[0][0], SW, SH, 238, 186, "PRESS START", rgb(255, 235, 150), 2);
-        if (G.bot_dirty) { fill(&fb_bot[0][0], BW, 0, 0, BW, BH, rgb(14, 10, 26)); G.bot_dirty = 0; }
+        if (G.bot_dirty) { fill(&fb_bot[0][0], BW, 0, 0, BW, BH, rgb(14, 10, 26)); G.bot_dirty = 0; G.bot_dirty_seen = 1; }
         return;
     }
     if (G.bg_dirty) render_bg();

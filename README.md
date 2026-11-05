@@ -54,6 +54,7 @@ Konsola musi mieć custom firmware (np. Luma3DS). Pliki są w [`release/`](relea
 | **↓** | zeskok z cienkiej platformy |
 | **↑** | rozmowa, tablica, latarnia (zapis i leczenie) |
 | **START** | pauza |
+| **SELECT** | licznik wydajności na dolnym ekranie |
 
 ## Świat
 
@@ -114,4 +115,21 @@ Bot steruje grą tymi samymi przyciskami co gracz i korzysta z prawdziwej fizyki
 - **`t_full`** przechodzi grę od ekranu tytułowego do napisów. Wrogowie są nieszkodliwi tylko na trasie między celami, bossowie zadają normalne obrażenia.
 - **`t_misc`** sprawdza śmierć, zapis po restarcie, pauzę, dźwięk i renderowanie wszystkich pokoi.
 
+- **`tests/fuzz.c`** gra losowymi przyciskami we wszystkich pokojach pod ASan i UBSan, sprawdza utknięcia w ścianach, wyjście poza ekran i uszkodzone pliki zapisu.
+
 `.3dsx` i instalacja `.cia` zostały sprawdzone w emulatorze Azahar. Gra nie była jeszcze uruchamiana na fizycznej konsoli, więc wydajność i dźwięk na sprzęcie są niepotwierdzone.
+
+## Wydajność
+
+Pomiar kodu ARM w emulatorze Azahar, 240 klatek w każdym z 40 pokoi, budżet klatki to 16,67 ms. Pełny wynik: [`docs/perf-azahar.txt`](docs/perf-azahar.txt).
+
+| Co | Średnio | Najwięcej |
+|---|---:|---:|
+| Logika i rysowanie | 1,3 ms | ok. 8 ms (przejście między pokojami) |
+| Kopiowanie na oba ekrany | 3,4 ms | 3,4 ms |
+| Dźwięk | 0,4 ms | 1,5 ms |
+| Zapis na kartę (tylko latarnia i przedmioty) | | ok. 90 ms |
+
+Emulator nie odwzorowuje dokładnie czasów pamięci i karty SD, więc to szacunek, a nie wynik ze sprzętu. Na konsoli **SELECT** pokazuje na dolnym ekranie `logika/cała klatka MAX najgorsza LATE liczba spóźnionych klatek` w milisekundach. Wynik nad 16,6 ms oznacza spóźnioną klatkę.
+
+Fuzz (1,5 mln klatek): 0 błędów pamięci, 0 klatek w ścianie, 0 wyjść poza ekran i 0 z 28 uszkodzonych zapisów przyjętych przez grę.

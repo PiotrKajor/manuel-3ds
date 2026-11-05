@@ -90,7 +90,7 @@ typedef struct {
     int8_t near_i;
     uint8_t dlg_id, dlg_page, dlg_after;
     uint16_t dlg_pos, dlg_len;
-    uint8_t menu, title_t, bg_dirty, bot_dirty, timer, song, msg_t;
+    uint8_t menu, title_t, bg_dirty, bot_dirty, bot_dirty_seen, timer, song, msg_t;
     const char *msg;
     uint16_t counters[4];    /* deaths, kills, hits taken, frames/3600 */
 } Game;

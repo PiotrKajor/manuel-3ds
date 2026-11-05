@@ -245,7 +245,7 @@ r.block(3, 8, 6, 12).ability('HOOK', 4, 7).plat(8, 10, 10).enemy(BELLFISH, 12, 3
 r = R('archive', "DROWNED ARCHIVE", 1, 10, 3).l()
 r.crack(13, 16).enemy(FROG, 8).enemy(BELLFISH, 19, 3).plat(4, 7, 9).plat(18, 21, 9)
 
-r = R('vault', "SUNK VAULT", 1, 10, 4).u(13, 15, ladder=(10, 7, 4))
+r = R('vault', "SUNK VAULT", 1, 10, 4).u(13, 16, ladder=(10, 7, 4))
 r.shard(4).pit(7, 10).enemy(FROG, 19).plat(7, 10, 10)
 
 r = R('bells', "HANGING BELLS", 1, 10, 2).l().r()
@@ -344,6 +344,16 @@ def exits(r):
     return out
 
 
+def check_vertical(r):
+    """An opening in a floor must line up exactly with the opening in the ceiling below it."""
+    if 'd' not in r.doors:
+        return
+    below = BYPOS[(r.x, r.y + 1)]
+    fall = {x for x in range(W) if r.g[13][x] in '-x' and r.g[14][x] in '.x'}
+    rise = {x for x in range(W) if below.g[0][x] in '.D'}
+    assert fall == rise, ('vertical openings differ', r.key, sorted(fall), below.key, sorted(rise))
+
+
 def tile_rows(r):
     """Room grid as tile ids. Lantern and tablet cells are mapped here."""
     out = []
@@ -380,4 +390,5 @@ def decorate(r):
 
 
 for _r in ROOMS:
+    check_vertical(_r)
     decorate(_r)

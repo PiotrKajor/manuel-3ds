@@ -1,0 +1,46 @@
+units: ms at the 268 MHz tick, budget 16.67 ms per frame
+present avg 3.37 max 3.43
+audio avg 0.38 max 1.52
+worst whole frame 96.12
+worst step room SUNK VAULT
+save file write max 90.14
+RINGER'S LOFT      step avg 1.13 max 8.33
+BELL STAIR         step avg 1.10 max 8.29
+UPPER SHAFT        step avg 1.10 max 8.29
+OLD CACHE          step avg 1.12 max 8.18
+SALT GALLERY       step avg 1.15 max 8.31
+BROKEN LIFT        step avg 1.14 max 8.15
+MINER'S REST       step avg 1.13 max 8.25
+RUSH SHRINE        step avg 1.17 max 8.31
+CRYSTAL SPAN       step avg 1.86 max 8.29
+FOREMAN'S PIT      step avg 1.36 max 8.44
+WATER GATE         step avg 1.18 max 8.32
+FLOODED NAVE       step avg 1.19 max 8.27
+ROPE WALK          step avg 1.15 max 8.16
+UNDERCROFT         step avg 1.12 max 8.31
+HOOK SHRINE        step avg 1.18 max 8.49
+DROWNED ARCHIVE    step avg 1.20 max 8.41
+SUNK VAULT         step avg 1.56 max 92.02
+HANGING BELLS      step avg 1.19 max 8.25
+CHOIR LOFT         step avg 1.11 max 8.26
+SPIRE WALK         step avg 1.19 max 8.32
+ROPE CHAMBER       step avg 1.37 max 8.45
+SLAG DOOR          step avg 1.16 max 8.28
+BLAST HALL         step avg 1.14 max 8.23
+CRANE BAY          step avg 1.13 max 8.32
+CASTING FLOOR      step avg 1.19 max 8.32
+CLEAVE FORGE       step avg 2.43 max 8.36
+OLD KILN           step avg 1.07 max 8.39
+SCRAP TOWER        step avg 1.82 max 8.36
+CINDER RUN         step avg 1.16 max 8.37
+FOUNDER'S HALL     step avg 1.42 max 8.47
+QUENCH ROOM        step avg 1.13 max 8.31
+ANVIL ROOM         step avg 1.40 max 8.49
+COLD STAIR         step avg 1.16 max 8.31
+WIND LEDGE         step avg 1.10 max 8.36
+FROZEN CHAPEL      step avg 1.22 max 8.58
+HUSH PASS          step avg 1.10 max 8.31
+CLOAK CAIRN        step avg 1.17 max 8.52
+HIGH SHELF         step avg 1.15 max 8.30
+LAST LANTERN       step avg 2.41 max 8.32
+SILENT BELFRY      step avg 1.38 max 8.49

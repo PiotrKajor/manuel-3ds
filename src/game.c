@@ -146,7 +146,7 @@ static void place_for_entry(uint8_t dir) {
     Player *p = &G.p;
     p->hook = 0;
     p->hook_last = 255;
-    if (dir == 1) p->x = (int32_t)(-HX + 2) << FP;              /* came through the left door */
+    if (dir == 1) p->x = (int32_t)(-HX + 2) * (1 << FP);              /* came through the left door */
     else if (dir == 2) p->x = (int32_t)(SW - HX - HW - 2) << FP; /* came through the right door */
     else if (dir == 3) {                                          /* came up through the floor */
         p->y = (int32_t)(240 - 32) << FP;
@@ -154,9 +154,21 @@ static void place_for_entry(uint8_t dir) {
         p->boost = 30;
         p->drop_t = 0;
     } else if (dir == 4) {                                        /* fell through the ceiling */
-        p->y = (int32_t)(-20) << FP;
+        p->y = (int32_t)(-20) * (1 << FP);
     }
     if (dir == 1 || dir == 2) p->vy = 0;
+    /* last line of defence: never start a room inside a wall */
+    {
+        int d;
+        for (d = 1; d < 64 && box_solid(PX(p->x) + HX, PX(p->y) + HY, HW, HH); d++) {
+            int32_t ox = p->x;
+            p->x = ox + (int32_t)d * (1 << FP);
+            if (!box_solid(PX(p->x) + HX, PX(p->y) + HY, HW, HH)) break;
+            p->x = ox - (int32_t)d * (1 << FP);
+            if (!box_solid(PX(p->x) + HX, PX(p->y) + HY, HW, HH)) break;
+            p->x = ox;
+        }
+    }
     p->safe_x = p->x; p->safe_y = p->y;
 }
 

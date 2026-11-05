@@ -17,8 +17,8 @@ void spawn_enemy(uint8_t kind, int tx, int ty) {
             e->on = 1;
             e->kind = kind;
             e->hp = en_hp[kind];
-            e->x = (int32_t)(tx * TS - 8) << FP;
-            e->y = (int32_t)(ty * TS - 16) << FP;
+            e->x = (int32_t)(tx * TS - 8) * (1 << FP);
+            e->y = (int32_t)(ty * TS - 16) * (1 << FP);
             e->oy = e->y;
             e->dir = (uint8_t)(tx & 1);
             e->timer = (uint8_t)(tx * 7);
@@ -145,7 +145,7 @@ void proj_spawn(uint8_t kind, int x, int y, int vx, int vy, uint8_t grav) {
         if (!G.pr[i].on) {
             Proj *q = &G.pr[i];
             q->on = 1; q->kind = kind; q->grav = grav;
-            q->x = (int32_t)x << FP; q->y = (int32_t)y << FP; q->vx = vx; q->vy = vy;
+            q->x = (int32_t)x * (1 << FP); q->y = (int32_t)y * (1 << FP); q->vx = vx; q->vy = vy;
             return;
         }
 }
